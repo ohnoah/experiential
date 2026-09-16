@@ -401,7 +401,7 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
         try:
-            if "probability-regression" in json.dumps(payload):
+            if "probability-regression" in json.dumps(payload) or "top_logprobs" in payload:
                 terminal_status = (
                     "incomplete" if "probability-incomplete" in json.dumps(payload) else "completed"
                 )
@@ -1721,7 +1721,7 @@ def test_responses_probability_incomplete_nonstream_preserves_terminal_records(
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["status"] == "incomplete"
+    assert body["status"] == "incomplete", body
     record = body["output"][0]["content"][0]["logprobs"][0]
     assert record == {"token": "OK", "logprob": -0.125000123, "bytes": [79, 75]}
 
@@ -2069,7 +2069,7 @@ def test_responses_capped_silent_stop_is_incomplete_max_output_tokens(
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["status"] == "incomplete"
+    assert body["status"] == "incomplete", body
     assert body["incomplete_details"] == {"reason": "max_output_tokens"}
     assert body["output"] == []
 
