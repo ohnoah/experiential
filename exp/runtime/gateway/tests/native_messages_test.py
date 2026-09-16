@@ -1699,6 +1699,47 @@ def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
     assert body["output"][0]["content"][0]["logprobs"][0]["logprob"] == -0.125000123
 
 
+def test_responses_probability_continuation_replays_history_without_logprobs(
+    responses_engine: _ServingEngine,
+) -> None:
+    """Continuation history keeps text and bytes while omitting provider metadata."""
+    with _ResponsesUpstream.payloads_lock:
+        _ResponsesUpstream.payloads.clear()
+    headers = {"authorization": f"Bearer {responses_engine.raw_key}"}
+    first = httpx.post(
+        f"{responses_engine.base}/v1/responses",
+        headers=headers,
+        json={
+            "model": "responses",
+            "input": "probability-regression",
+            "include": ["message.output_text.logprobs"],
+            "top_logprobs": 0,
+        },
+        timeout=30.0,
+    )
+    assert first.status_code == 200
+    first_body = first.json()
+    second = httpx.post(
+        f"{responses_engine.base}/v1/responses",
+        headers=headers,
+        json={
+            "model": "responses",
+            "previous_response_id": first_body["id"],
+            "input": "probability-regression-continue",
+            "include": ["message.output_text.logprobs"],
+            "top_logprobs": 0,
+        },
+        timeout=30.0,
+    )
+    assert second.status_code == 200
+    second_body = second.json()
+    assert second_body["output"][0]["content"][0]["logprobs"][0]["bytes"] == [79, 75]
+    with _ResponsesUpstream.payloads_lock:
+        dispatched = tuple(_ResponsesUpstream.payloads)
+    assert len(dispatched) == 2
+    assert all("logprobs" not in json.dumps(item) for item in dispatched[1]["input"])
+
+
 @pytest.mark.parametrize(("prompt", "stop_reason"), _ZERO_OUTPUT_MESSAGES_CASES)
 def test_messages_non_stream_zero_output_keeps_real_input_tokens(
     engine: _ServingEngine,
