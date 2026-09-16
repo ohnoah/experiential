@@ -203,7 +203,10 @@ impl Normalizer {
                 });
             }
             "response.output_text.done" | "response.content_part.done" => {
-                if let Some(records) = payload.get("logprobs") {
+                let records = payload
+                    .get("logprobs")
+                    .or_else(|| payload.get("part").and_then(|part| part.get("logprobs")));
+                if let Some(records) = records {
                     let output_index =
                         openai_index(&payload, "output_index", "OpenAI output_index")?;
                     let item_id = openai_identity(&payload, "item_id", "OpenAI message item ID")?;
