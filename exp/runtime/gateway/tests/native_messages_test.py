@@ -916,11 +916,11 @@ def _responses_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_Ser
             supports_tools=True,
             supports_temperature=False,
             supports_logprobs=True,
-            supports_responses_logprobs=True,
         ),
-        gateway_capabilities=GatewayDeploymentCapabilities(
-            supports_streaming=True,
-            supports_streaming_tool_arguments=True,
+            gateway_capabilities=GatewayDeploymentCapabilities(
+                supports_streaming=True,
+                supports_streaming_tool_arguments=True,
+                supports_responses_logprobs=True,
         ),
         prices=GatewayTokenPrices(),
         pricing_source=None,

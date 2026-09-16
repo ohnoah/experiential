@@ -472,7 +472,6 @@ class ModelCapabilities(ContractModel):
     supports_top_p: bool | None = None
     supports_top_k: bool | None = None
     supports_logprobs: bool | None = None
-    supports_responses_logprobs: bool | None = None
     supports_frequency_penalty: bool | None = None
     supports_presence_penalty: bool | None = None
     supports_reasoning: bool = False

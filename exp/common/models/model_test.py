@@ -114,7 +114,6 @@ def test_model_request_keeps_tool_contract_and_capabilities_deterministic() -> N
         "supports_top_p": None,
         "supports_top_k": None,
         "supports_logprobs": None,
-        "supports_responses_logprobs": None,
         "supports_frequency_penalty": None,
         "supports_presence_penalty": None,
         "supports_reasoning": False,
@@ -150,7 +149,6 @@ def test_completion_support_preserves_provider_identity_for_existing_traces() ->
     identity_payload = {
         "supports_tools": None,
         "supports_embeddings": None,
-        "supports_responses_logprobs": None,
         "context_window_tokens": None,
         "maximum_output_tokens": None,
     }

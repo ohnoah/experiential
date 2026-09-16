@@ -56,7 +56,7 @@ def _resolved_wire_profile(
             profile,
             model_id=profile.model_id or runtime_model.snapshot.model_id,
             supports_responses_logprobs=(
-                capabilities.supports_responses_logprobs is True
+                gateway_capabilities.supports_responses_logprobs
                 and profile.dialect == "openai_responses"
             ),
             billing_customer_managed=(deployment.billing_source == BillingSource.CUSTOMER_MANAGED),
