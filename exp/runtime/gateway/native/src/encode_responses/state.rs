@@ -99,7 +99,11 @@ impl MessageState {
                 "text": self.text,
                 "annotations": self.annotations,
             });
-            if let Some(value) = self.logprobs.get("terminal") {
+            if let Some(value) = self
+                .logprobs
+                .iter()
+                .find_map(|(key, value)| key.strip_prefix("terminal:").map(|_| value))
+            {
                 part["logprobs"] = value.clone();
             }
             content.push(part);
