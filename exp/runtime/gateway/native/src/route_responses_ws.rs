@@ -180,7 +180,15 @@ async fn handle_frame(
     // with an empty completed response and perform no model work.
     if let Some(generate) = body.remove("generate") {
         if generate == Value::Bool(false) {
-            if body.contains_key("top_logprobs") || body.contains_key("logprobs") {
+            let probability_include = body
+                .get("include")
+                .and_then(Value::as_array)
+                .is_some_and(|items| {
+                    items.iter().any(|item| {
+                        item.as_str() == Some("message.output_text.logprobs")
+                    })
+                });
+            if probability_include || body.contains_key("top_logprobs") || body.contains_key("logprobs") {
                 let error = PublicError::new(
                     400,
                     "invalid_request",
