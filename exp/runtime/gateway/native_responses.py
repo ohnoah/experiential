@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass
 from typing import Literal, cast
 
-from exp.common.core.artifacts import JsonObject, JsonValue, sha256_json
+from exp.common.core.artifacts import JsonObject, sha256_json
 from exp.common.models import ToolCall
 from exp.common.models.gateway_catalog import ExactModelDeployment
 from exp.runtime.gateway.contracts import (
@@ -177,19 +177,6 @@ def continuation_route_binding(
             }
         ),
     )
-
-
-def _without_probability_metadata(value: JsonValue) -> JsonValue:
-    """Project provider output for replay without customer probability metadata."""
-    if isinstance(value, dict):
-        return {
-            key: _without_probability_metadata(item)
-            for key, item in value.items()
-            if key != "logprobs"
-        }
-    if isinstance(value, list):
-        return [_without_probability_metadata(item) for item in value]
-    return value
 
 
 def remember_turn(
@@ -427,9 +414,7 @@ def remember_turn(
                 output_index,
                 GatewayMessage(
                     role="assistant",
-                    provider_native_item=cast(
-                        JsonObject, _without_probability_metadata(hosted_item)
-                    ),
+                    provider_native_item=hosted_item,
                 ),
             )
         )

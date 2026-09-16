@@ -464,3 +464,20 @@ def test_responses_wire_emits_instruction_only_requests_as_input_items() -> None
         "gpt-5.4", _developer_conversation(), supports_temperature=True
     )
     assert conversational["instructions"] == "Follow policy."
+
+
+def test_replayed_message_strips_only_output_text_probabilities() -> None:
+    from exp.runtime.models.providers.openai_payloads import _replayable_native_item
+
+    item = {
+        "type": "message",
+        "id": "msg_1",
+        "content": [
+            {"type": "output_text", "text": "ok", "logprobs": []},
+            {"type": "tool_result", "logprobs": {"customer": "keep"}},
+        ],
+    }
+    replayed = _replayable_native_item(item)
+    assert replayed is not None
+    assert "logprobs" not in replayed["content"][0]
+    assert replayed["content"][1]["logprobs"] == {"customer": "keep"}
