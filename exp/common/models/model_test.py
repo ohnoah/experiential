@@ -106,6 +106,7 @@ def test_model_request_keeps_tool_contract_and_capabilities_deterministic() -> N
     assert ModelCapabilities(supports_tools=True).model_dump(mode="json") == {
         "supports_tools": True,
         "supports_embeddings": None,
+        "supports_responses_logprobs": None,
         "supports_image_generation": None,
         "emits_images": False,
         "supports_structured_output": False,
