@@ -1,7 +1,7 @@
 //! Responses probability commitment and retention regressions.
 use super::*;
 
-const DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-a","content_index":0,"delta":"OK","logprobs":[{"token":"OK","logprob":-0.125,"bytes":[79,75]}]}"#;
+const DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-a","content_index":0,"delta":"","logprobs":[{"token":"OK","logprob":-0.125,"bytes":[79,75]}]}"#;
 const TERMINAL: &str = r#"{"type":"response.completed","response":{"status":"completed","output":[{"id":"msg-a","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"OK","logprobs":[{"token":"OK","logprob":-0.125,"bytes":[79,75]}]}]}],"usage":{"input_tokens":1,"output_tokens":1}}}"#;
 
 fn responses_probability_wire(id: &str, url: &str) -> DeploymentWire {
@@ -53,6 +53,10 @@ fn responses_probability_commits_without_ttft_and_prevents_late_fallback() {
         };
         assert_eq!(committed.depth, 0);
         assert!(committed.relay.first_token_at().is_none());
+        assert!(committed.prefix.iter().any(|event| matches!(
+            event,
+            Event::ProviderResponsesLogprobs { records, .. } if records.as_array().is_some_and(|items| !items.is_empty())
+        )));
         assert!(second.accepted.lock().unwrap().is_empty());
     });
 }

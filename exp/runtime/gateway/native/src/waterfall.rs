@@ -135,7 +135,6 @@ fn is_semantic(event: &Event) -> bool {
             | Event::ProviderRefusalDelta { .. }
             | Event::ChoiceLogprobsDelta { .. }
             | Event::ProviderResponsesLogprobs { .. }
-            | Event::ProviderOutputItemStarted { .. }
             | Event::ProviderOutputItemCompleted { .. }
             | Event::ReasoningSummaryDelta { .. }
             | Event::ThinkingDelta { .. }
