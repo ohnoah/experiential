@@ -169,7 +169,9 @@ class GatewayEvent(ContractModel):
                 or self.responses_logprobs_phase is None
                 or self.responses_logprobs_records is None
             ):
-                raise ValueError("Responses probability events require identity, phase, and records")
+                raise ValueError(
+                    "Responses probability events require identity, phase, and records"
+                )
         elif self.kind == GatewayEventKind.REASONING_SUMMARY_DELTA:
             if (
                 self.text_delta is None
