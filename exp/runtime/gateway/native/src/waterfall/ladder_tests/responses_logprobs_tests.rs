@@ -128,7 +128,7 @@ fn responses_empty_probability_scaffolding_does_not_escape_failed_attempt() {
             output_less_retention: None,
             output_token_cap: None,
         };
-        let Won::Committed(mut committed) = acquire_attempt(&context, &mut guard).await else {
+        let Won::Committed(committed) = acquire_attempt(&context, &mut guard).await else {
             panic!("fallback must commit");
         };
         assert_eq!(committed.depth, 1);
