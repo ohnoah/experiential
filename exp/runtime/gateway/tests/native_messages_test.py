@@ -471,7 +471,6 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                             "type": terminal_event,
                             "response": {
                                 "status": terminal_status,
-                                "incomplete_details": {"reason": "max_output_tokens"},
                                 "output": [
                                     {
                                         "id": "msg_probability",
