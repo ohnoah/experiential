@@ -32,6 +32,7 @@ from typing import cast
 import httpx
 import pytest
 from openai import OpenAI
+from websockets.sync.client import connect
 
 from exp.common.core.artifacts import JsonObject
 from exp.common.models import ModelCapabilities
@@ -1702,6 +1703,42 @@ def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
     assert body["output"][0]["content"][0]["logprobs"][0]["token"] == "OK"
     assert body["output"][0]["content"][0]["logprobs"][0]["bytes"] == [79, 75]
     assert body["output"][0]["content"][0]["logprobs"][0]["logprob"] == -0.125000123
+
+
+def test_responses_ws_probability_generation_preserves_phases(
+    responses_engine: _ServingEngine,
+) -> None:
+    """Generating Responses WebSocket retains delta and terminal probabilities."""
+    with connect(
+        f"ws://{responses_engine.base.removeprefix('http://')}/v1/responses",
+        additional_headers={"Authorization": f"Bearer {responses_engine.raw_key}"},
+    ) as socket:
+        socket.send(
+            json.dumps(
+                {
+                    "type": "response.create",
+                    "model": "responses",
+                    "input": "probability-regression",
+                    "include": ["message.output_text.logprobs"],
+                    "top_logprobs": 0,
+                }
+            )
+        )
+        events: list[JsonObject] = []
+        while True:
+            event = json.loads(socket.recv(timeout=30))
+            assert isinstance(event, dict)
+            events.append(event)
+            if event["type"] in {"response.completed", "response.incomplete"}:
+                break
+    delta = next(event for event in events if event["type"] == "response.output_text.delta")
+    assert delta["logprobs"][0]["bytes"] == [79, 75]
+    done = next(event for event in events if event["type"] == "response.output_text.done")
+    assert done["logprobs"][0]["logprob"] == -0.1250001
+    terminal = events[-1]
+    record = terminal["response"]["output"][0]["content"][0]["logprobs"][0]
+    assert record["logprob"] == -0.125000123
+    assert record["bytes"] == [79, 75]
 
 
 def test_responses_probability_incomplete_nonstream_preserves_terminal_records(
