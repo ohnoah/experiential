@@ -75,7 +75,8 @@ fn responses_probability_records_count_toward_retained_bytes() {
 }
 
 const EMPTY_DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-empty","content_index":0,"delta":"","logprobs":[]}"#;
-const FAILED: &str = r#"{"type":"response.failed","response":{"status":"failed","error":{"code":"rate_limit_exceeded","message":"try another rung"}}}"#;
+const FAILED: &str =
+    r#"{"type":"error","code":"rate_limit_exceeded","message":"try another rung"}"#;
 const SECOND_DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-b","content_index":0,"delta":"","logprobs":[{"token":"B","logprob":-0.25,"bytes":[66]}]}"#;
 
 #[test]
