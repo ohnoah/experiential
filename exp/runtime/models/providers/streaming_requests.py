@@ -146,7 +146,8 @@ def route_generation_parameter_requests(
     """
     if not profiles:
         raise ValueError("generation parameter shaping requires at least one wire profile")
-    require_chat_logprobs(profiles, request)
+    if request.surface == GatewayApiSurface.CHAT_COMPLETIONS:
+        require_chat_logprobs(profiles, request)
     require_responses_logprobs(profiles, request)
     for profile in profiles:
         if fireworks_continuation_required(profile, request):
