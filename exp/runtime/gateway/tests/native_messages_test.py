@@ -1765,7 +1765,7 @@ def test_responses_probability_continuation_replays_history_without_logprobs(
         dispatched = tuple(_ResponsesUpstream.payloads)
     assert len(dispatched) == 2
     replayed = cast(list[JsonObject], dispatched[1]["input"])
-    assert all("logprobs" not in json.dumps(item) for item in replayed)
+    assert all("logprobs" not in json.dumps(item) for item in replayed), replayed
 
 
 @pytest.mark.parametrize(("prompt", "stop_reason"), _ZERO_OUTPUT_MESSAGES_CASES)

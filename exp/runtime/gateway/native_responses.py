@@ -179,6 +179,19 @@ def continuation_route_binding(
     )
 
 
+def _without_probability_metadata(value: JsonValue) -> JsonValue:
+    """Project provider output for replay without customer probability metadata."""
+    if isinstance(value, dict):
+        return {
+            key: _without_probability_metadata(item)
+            for key, item in value.items()
+            if key != "logprobs"
+        }
+    if isinstance(value, list):
+        return [_without_probability_metadata(item) for item in value]
+    return value
+
+
 def remember_turn(
     continuations: BoundedContinuationStore,
     *,
@@ -412,7 +425,10 @@ def remember_turn(
         indexed_natives.append(
             (
                 output_index,
-                GatewayMessage(role="assistant", provider_native_item=hosted_item),
+                GatewayMessage(
+                    role="assistant",
+                    provider_native_item=_without_probability_metadata(hosted_item),
+                ),
             )
         )
     raw_carrier = data.get("reasoning_content_carrier")
