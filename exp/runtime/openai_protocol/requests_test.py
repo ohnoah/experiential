@@ -1522,12 +1522,12 @@ def test_responses_decoder_keeps_orphaned_reasoning_as_its_own_turn() -> None:
 
 
 def test_responses_decoder_rejects_unknown_include_paths() -> None:
-    """Only the encrypted reasoning include selector is honored."""
+    """Unknown include selectors remain rejected by name."""
     with pytest.raises(OpenAIProtocolError) as raised:
         decode_responses(
             {
                 "model": "coding",
-                "include": ["message.output_text.logprobs"],
+                "include": ["web_search_call.results"],
                 "input": "hi",
             }
         )

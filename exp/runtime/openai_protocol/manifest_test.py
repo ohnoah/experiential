@@ -72,7 +72,7 @@ def test_manifests_classify_explicit_exclusions() -> None:
     assert responses["store"] == CompatibilityDisposition.SUPPORTED
     assert responses["top_p"] == CompatibilityDisposition.SUPPORTED
     assert responses["top_k"] == CompatibilityDisposition.CONDITIONALLY_SUPPORTED
-    assert responses["top_logprobs"] == CompatibilityDisposition.UNSUPPORTED
+    assert responses["top_logprobs"] == CompatibilityDisposition.CONDITIONALLY_SUPPORTED
 
 
 def _sdk_literal_values(annotation: object) -> frozenset[str]:
