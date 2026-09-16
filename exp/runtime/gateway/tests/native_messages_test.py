@@ -31,6 +31,7 @@ from typing import cast
 
 import httpx
 import pytest
+from openai import OpenAI
 
 from exp.common.core.artifacts import JsonObject
 from exp.common.models import ModelCapabilities
@@ -400,6 +401,69 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
         try:
+            if "probability-regression" in json.dumps(payload):
+                records = [{"token": "OK", "logprob": -0.125, "bytes": [79, 75]}]
+                self.wfile.write(
+                    _sse_frame({
+                        "type": "response.output_text.delta",
+                        "output_index": 0,
+                        "item_id": "msg_probability",
+                        "content_index": 0,
+                        "delta": "OK",
+                        "logprobs": records,
+                    })
+                )
+                self.wfile.write(
+                    _sse_frame({
+                        "type": "response.output_text.done",
+                        "output_index": 0,
+                        "item_id": "msg_probability",
+                        "content_index": 0,
+                        "text": "OK",
+                        "logprobs": records,
+                    })
+                )
+                self.wfile.write(
+                    _sse_frame({
+                        "type": "response.content_part.done",
+                        "output_index": 0,
+                        "item_id": "msg_probability",
+                        "content_index": 0,
+                        "part": {"type": "output_text", "text": "OK", "logprobs": []},
+                    })
+                )
+                self.wfile.write(
+                    _sse_frame({
+                        "type": "response.output_item.done",
+                        "output_index": 0,
+                        "item": {
+                            "id": "msg_probability",
+                            "type": "message",
+                            "role": "assistant",
+                            "status": "completed",
+                            "content": [{"type": "output_text", "text": "OK", "logprobs": records}],
+                        },
+                    })
+                )
+                self.wfile.write(
+                    _sse_frame({
+                        "type": "response.completed",
+                        "response": {
+                            "status": "completed",
+                            "output": [{
+                                "id": "msg_probability",
+                                "type": "message",
+                                "role": "assistant",
+                                "status": "completed",
+                                "content": [{"type": "output_text", "text": "OK", "logprobs": records}],
+                            }],
+                            "usage": {"input_tokens": 1, "output_tokens": 1},
+                        },
+                    })
+                )
+                self.wfile.write(b"data: [DONE]\n\n")
+                self.wfile.flush()
+                return
             if hosted_echoed:
                 # Turn 2 of the hosted lane: the continuation replayed the
                 # verbatim web_search_call item, so answer with plain text.
@@ -851,6 +915,7 @@ def _responses_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_Ser
             supports_reasoning=True,
             supports_tools=True,
             supports_temperature=False,
+            supports_logprobs=True,
         ),
         gateway_capabilities=GatewayDeploymentCapabilities(
             supports_streaming=True,
@@ -1564,6 +1629,34 @@ def test_responses_stream_zero_output_keeps_terminal_usage(
     assert usage is not None, "zero-output stream terminal dropped client-visible usage"
     assert usage["input_tokens"] == 9
     assert usage["output_tokens"] == 0
+
+
+def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
+    responses_engine: _ServingEngine,
+) -> None:
+    """The served native SSE path retains rich phase observations and final records."""
+    client = OpenAI(
+        base_url=f"{responses_engine.base}/v1",
+        api_key=responses_engine.raw_key,
+    )
+    with client.responses.stream(
+        model="responses",
+        input="probability-regression",
+        include=["message.output_text.logprobs"],
+        top_logprobs=0,
+        store=False,
+    ) as stream:
+        events = list(stream)
+        final = stream.get_final_response()
+    event_types = [event.type for event in events]
+    assert "response.output_text.delta" in event_types
+    assert "response.output_text.done" in event_types
+    assert "response.output_item.done" in event_types
+    assert final.output[0].content[0].text == "OK"
+    assert final.output[0].content[0].logprobs[0].token == "OK"
+    assert final.output[0].content[0].logprobs[0].bytes == [79, 75]
+    body = final.model_dump()
+    assert body["output"][0]["content"][0]["logprobs"][0]["logprob"] == -0.125
 
 
 @pytest.mark.parametrize(("prompt", "stop_reason"), _ZERO_OUTPUT_MESSAGES_CASES)

@@ -63,7 +63,7 @@ def require_responses_logprobs(
     if not request.include_output_text_logprobs and request.top_logprobs is None:
         return
     for profile in profiles:
-        if profile.dialect != "openai_responses" or not profile.supports_logprobs:
+        if profile.dialect != "openai_responses" or not profile.supports_responses_logprobs:
             raise ProviderParameterError(
                 message="This model route cannot preserve Responses output text probabilities.",
                 param="top_logprobs" if request.top_logprobs is not None else "include",
