@@ -150,6 +150,27 @@ impl Normalizer {
                     });
                 }
                 let delta = optional_text(&payload, "delta", "OpenAI text delta")?;
+                if let Some(records) = payload.get("logprobs") {
+                    if !records.is_null() {
+                        events.push(Event::ProviderResponsesLogprobs {
+                            output_index,
+                            item_id: item_id.clone(),
+                            content_index: payload
+                                .get("content_index")
+                                .map(|_| {
+                                    openai_index(
+                                        &payload,
+                                        "content_index",
+                                        "OpenAI content_index",
+                                    )
+                                })
+                                .transpose()?
+                                .unwrap_or(0),
+                            phase: "delta".to_string(),
+                            records: records.clone(),
+                        });
+                    }
+                }
                 if !delta.is_empty() {
                     events.push(Event::ProviderTextDelta {
                         output_index,
