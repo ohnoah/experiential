@@ -8,6 +8,8 @@ OpenAI-compatible Chat builders live here; ``dialect_stream_payload`` in
 
 from __future__ import annotations
 
+from typing import cast
+
 from exp.common.core.artifacts import JsonObject
 from exp.common.models import ChatMaxTokensField
 from exp.runtime.gateway.contracts import GatewayRequest
@@ -41,10 +43,11 @@ _FOREIGN_ITEM_ID_PREFIX = "item_"
 
 def _without_probability_metadata(item: JsonObject) -> JsonObject:
     """Drop only output-text probability fields from a replayed message."""
-    if item.get("type") != "message" or not isinstance(item.get("content"), list):
+    content_value = item.get("content")
+    if item.get("type") != "message" or not isinstance(content_value, list):
         return item
-    content = []
-    for part in item["content"]:
+    content: list[JsonValue] = []
+    for part in cast(list[JsonValue], content_value):
         if isinstance(part, dict) and part.get("type") == "output_text":
             content.append({key: value for key, value in part.items() if key != "logprobs"})
         else:
