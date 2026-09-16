@@ -1,6 +1,7 @@
 //! OpenAI Responses probability observations.
 
 use serde_json::{Map, Value};
+use std::io::{self, Write};
 
 use crate::errors::{Failure, FailureClass};
 use crate::events::Event;
@@ -14,45 +15,29 @@ pub(crate) fn records_are_bounded(records: &Value) -> bool {
     let Some(records) = records.as_array() else {
         return false;
     };
-    json_size(records, MAX_RECORDS_BYTES).is_some() && records.iter().all(valid_record)
+    json_size_records(records, MAX_RECORDS_BYTES).is_some() && records.iter().all(valid_record)
 }
 
 /// Count JSON bytes without allocating a serialized copy.
-pub(crate) fn json_size(value: &Value, limit: usize) -> Option<usize> {
-    fn add(total: &mut usize, amount: usize, limit: usize) -> Option<()> {
-        *total = total.checked_add(amount)?;
-        (*total <= limit).then_some(())
+fn json_size_records(records: &[Value], limit: usize) -> Option<usize> {
+    let mut counter = ByteCounter { size: 0 };
+    serde_json::to_writer(&mut counter, records).ok()?;
+    (counter.size <= limit).then_some(counter.size)
+}
+
+struct ByteCounter {
+    size: usize,
+}
+
+impl Write for ByteCounter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.size = self.size.saturating_add(bytes.len());
+        Ok(bytes.len())
     }
-    fn walk(value: &Value, limit: usize) -> Option<usize> {
-        let mut total = 0;
-        match value {
-            Value::Null => add(&mut total, 4, limit)?,
-            Value::Bool(value) => add(&mut total, if *value { 4 } else { 5 }, limit)?,
-            Value::Number(value) => add(&mut total, value.to_string().len(), limit)?,
-            Value::String(value) => add(&mut total, value.len() + 2, limit)?,
-            Value::Array(values) => {
-                add(&mut total, 2, limit)?;
-                for value in values {
-                    total = total.checked_add(walk(value, limit - total)?)?;
-                    if total > limit {
-                        return None;
-                    }
-                }
-            }
-            Value::Object(values) => {
-                add(&mut total, 2, limit)?;
-                for (key, value) in values {
-                    total = total.checked_add(key.len() + 3)?;
-                    total = total.checked_add(walk(value, limit - total)?)?;
-                    if total > limit {
-                        return None;
-                    }
-                }
-            }
-        }
-        Some(total)
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
-    walk(value, limit)
 }
 
 fn valid_record(record: &Value) -> bool {
@@ -77,10 +62,32 @@ fn valid_record(record: &Value) -> bool {
     });
     let alternatives_ok = record.get("top_logprobs").is_none_or(|alternatives| {
         alternatives.as_array().is_some_and(|alternatives| {
-            alternatives.len() <= 20 && alternatives.iter().all(valid_record)
+            alternatives.len() <= 20 && alternatives.iter().all(valid_alternative)
         })
     });
     token_ok && logprob_ok && bytes_ok && alternatives_ok
+}
+
+fn valid_alternative(value: &Value) -> bool {
+    let Some(value) = value.as_object() else {
+        return false;
+    };
+    value.get("token").is_some_and(|token| {
+        token
+            .as_str()
+            .is_some_and(|token| token.chars().count() <= MAX_TOKEN_CHARS)
+    }) && value
+        .get("logprob")
+        .is_some_and(|logprob| logprob.as_f64().is_some_and(f64::is_finite))
+        && value.get("bytes").is_none_or(|bytes| {
+            bytes.as_array().is_some_and(|bytes| {
+                bytes.len() <= MAX_BYTES
+                    && bytes
+                        .iter()
+                        .all(|byte| byte.as_u64().is_some_and(|byte| byte <= u8::MAX as u64))
+            })
+        })
+        && !value.contains_key("top_logprobs")
 }
 
 fn validate(records: &Value) -> Result<(), Failure> {
