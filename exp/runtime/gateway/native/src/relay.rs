@@ -61,6 +61,7 @@ pub fn event_retained_bytes(event: &Event) -> usize {
         Event::HostedToolItemProgress { payload, .. } => payload.len(),
         Event::ProviderTextAnnotation { annotation, .. } => annotation.len(),
         Event::ChoiceLogprobsDelta(delta) => delta.retained_bytes(),
+        Event::ProviderResponsesLogprobs { records, .. } => records.to_string().len(),
         _ => 64,
     }
 }
