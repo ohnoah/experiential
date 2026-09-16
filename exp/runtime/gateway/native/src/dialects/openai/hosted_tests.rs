@@ -76,6 +76,26 @@ fn message_item_done_preserves_each_content_part_probability_record() {
     assert_eq!(probabilities[1].2[0]["token"], "B");
 }
 
+#[test]
+fn malformed_responses_probability_records_fail_closed() {
+    for records in [
+        serde_json::json!([{"token": 7, "logprob": -0.1}]),
+        serde_json::json!([{"token": "x", "logprob": "bad"}]),
+        serde_json::json!([{"token": "x", "logprob": -0.1, "top_logprobs": [{"token": "y"}]}]),
+    ] {
+        let mut normalizer = Normalizer::new(Dialect::OpenAiResponses);
+        let frame = hosted_frame(serde_json::json!({
+            "type": "response.output_text.delta",
+            "output_index": 0,
+            "item_id": "msg_bad",
+            "content_index": 0,
+            "delta": "x",
+            "logprobs": records,
+        }));
+        assert!(normalizer.feed(&frame).is_err());
+    }
+}
+
 /// Frame shapes mirror the documented Responses web_search lifecycle
 /// (`output_item.added`, the three `response.web_search_call.*` status
 /// events, `output_item.done` with the final `action`, and a cited answer;

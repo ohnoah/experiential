@@ -5,43 +5,45 @@ use serde_json::{Map, Value};
 use crate::errors::{Failure, FailureClass};
 use crate::events::Event;
 
-const MAX_RECORDS: usize = 4096;
 const MAX_TOKEN_CHARS: usize = 256;
 const MAX_BYTES: usize = 4096;
+const MAX_RECORDS_BYTES: usize = 1_048_576;
 
 /// Check the bounded JSON shape accepted for one provider probability phase.
 pub(crate) fn records_are_bounded(records: &Value) -> bool {
     let Some(records) = records.as_array() else {
         return false;
     };
-    records.len() <= MAX_RECORDS
-        && records.iter().all(|record| {
-            let Some(record) = record.as_object() else {
-                return false;
-            };
-            let token_ok = record
-                .get("token")
-                .and_then(Value::as_str)
-                .is_none_or(|token| token.chars().count() <= MAX_TOKEN_CHARS);
-            let logprob_ok = record
-                .get("logprob")
-                .and_then(Value::as_f64)
-                .is_none_or(f64::is_finite);
-            let bytes_ok = record.get("bytes").is_none_or(|bytes| {
-                bytes.as_array().is_some_and(|bytes| {
-                    bytes.len() <= MAX_BYTES
-                        && bytes
-                            .iter()
-                            .all(|byte| byte.as_u64().is_some_and(|byte| byte <= u8::MAX as u64))
-                })
-            });
-            let alternatives_ok = record.get("top_logprobs").is_none_or(|alternatives| {
-                alternatives
-                    .as_array()
-                    .is_some_and(|alternatives| alternatives.len() <= 20)
-            });
-            token_ok && logprob_ok && bytes_ok && alternatives_ok
+    serde_json::to_vec(records).is_ok_and(|encoded| encoded.len() <= MAX_RECORDS_BYTES)
+        && records.iter().all(valid_record)
+}
+
+fn valid_record(record: &Value) -> bool {
+    let Some(record) = record.as_object() else {
+        return false;
+    };
+    let token_ok = record.get("token").is_some_and(|token| {
+        token
+            .as_str()
+            .is_some_and(|token| token.chars().count() <= MAX_TOKEN_CHARS)
+    });
+    let logprob_ok = record
+        .get("logprob")
+        .is_some_and(|logprob| logprob.as_f64().is_some_and(f64::is_finite));
+    let bytes_ok = record.get("bytes").is_none_or(|bytes| {
+        bytes.as_array().is_some_and(|bytes| {
+            bytes.len() <= MAX_BYTES
+                && bytes
+                    .iter()
+                    .all(|byte| byte.as_u64().is_some_and(|byte| byte <= u8::MAX as u64))
         })
+    });
+    let alternatives_ok = record.get("top_logprobs").is_none_or(|alternatives| {
+        alternatives.as_array().is_some_and(|alternatives| {
+            alternatives.len() <= 20 && alternatives.iter().all(valid_record)
+        })
+    });
+    token_ok && logprob_ok && bytes_ok && alternatives_ok
 }
 
 fn validate(records: &Value) -> Result<(), Failure> {
