@@ -149,6 +149,10 @@ def openai_responses_stream_payload(
             for role, content in zip(instruction_roles, instructions, strict=True)
         ]
         instructions = []
+    # Output probabilities are response metadata and are never valid input
+    # history. Keep the durable response untouched while projecting replay
+    # items without those annotations.
+    items = [_without_probability_metadata(item) for item in items]
     # Upstream storage stays disabled regardless of the caller's `store`
     # selector: continuation state is gateway-owned, the gateway never
     # references a provider-stored response, and disabled storage is what
