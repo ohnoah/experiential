@@ -479,5 +479,9 @@ def test_replayed_message_strips_only_output_text_probabilities() -> None:
     }
     replayed = _replayable_native_item(item)
     assert replayed is not None
-    assert "logprobs" not in replayed["content"][0]
-    assert replayed["content"][1]["logprobs"] == {"customer": "keep"}
+    content = replayed.get("content")
+    assert isinstance(content, list)
+    first, second = content
+    assert isinstance(first, dict) and "logprobs" not in first
+    assert isinstance(second, dict)
+    assert second.get("logprobs") == {"customer": "keep"}
