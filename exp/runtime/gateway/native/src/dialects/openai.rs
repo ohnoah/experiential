@@ -18,7 +18,9 @@ use crate::events::{
 const MAXIMUM_OPENAI_ID_CHARS: usize = 256;
 
 mod hosted;
-use super::responses_logprobs::{item_done_events, payload_records, terminal_events};
+use super::responses_logprobs::{
+    item_done_events, payload_records, records_are_bounded, terminal_events,
+};
 use hosted::{is_openai_hosted_item_type, is_openai_hosted_progress_event};
 
 fn openai_identity(
@@ -152,6 +154,11 @@ impl Normalizer {
                 }
                 let delta = optional_text(&payload, "delta", "OpenAI text delta")?;
                 if let Some(records) = payload_records(&payload) {
+                    if !records_are_bounded(&records) {
+                        return Err(malformed(
+                            "OpenAI Responses probability records are invalid",
+                        ));
+                    }
                     if !records.is_null() {
                         events.push(Event::ProviderResponsesLogprobs {
                             output_index,
@@ -202,6 +209,11 @@ impl Normalizer {
             }
             "response.output_text.done" | "response.content_part.done" => {
                 if let Some(records) = payload_records(&payload) {
+                    if !records_are_bounded(&records) {
+                        return Err(malformed(
+                            "OpenAI Responses probability records are invalid",
+                        ));
+                    }
                     let output_index =
                         openai_index(&payload, "output_index", "OpenAI output_index")?;
                     let item_id = openai_identity(&payload, "item_id", "OpenAI message item ID")?;

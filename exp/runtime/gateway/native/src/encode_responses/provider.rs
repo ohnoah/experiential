@@ -187,6 +187,14 @@ impl ResponsesSseEncoder {
                 }
                 state.status = status.or(state.status);
                 state.phase = phase.or(state.phase);
+                let no_probabilities = state.logprobs.is_empty();
+                let _ = state;
+                if no_probabilities {
+                    return Ok(self.close_message(
+                        key,
+                        status.unwrap_or(ProviderOutputItemStatus::Completed),
+                    ));
+                }
                 // The provider's item completion can precede the terminal
                 // response, whose output carries the authoritative rich
                 // probability records. Keep the message open so finish()

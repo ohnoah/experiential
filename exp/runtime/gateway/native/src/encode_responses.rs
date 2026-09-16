@@ -124,6 +124,11 @@ impl ResponsesSseEncoder {
                 phase,
                 records,
             } => {
+                if *content_index != 0 {
+                    return Err(invalid_provider_stream(
+                        "Responses probability records for multipart content are unsupported.",
+                    ));
+                }
                 let key = MessageKey::Provider(*output_index);
                 let state = self.messages.get_mut(&key).ok_or_else(|| {
                     invalid_provider_stream("Responses probabilities arrived before message")

@@ -2,8 +2,56 @@
 
 use serde_json::{Map, Value};
 
-use crate::errors::Failure;
+use crate::errors::{Failure, FailureClass};
 use crate::events::Event;
+
+const MAX_RECORDS: usize = 4096;
+const MAX_TOKEN_CHARS: usize = 256;
+const MAX_BYTES: usize = 4096;
+
+/// Check the bounded JSON shape accepted for one provider probability phase.
+pub(crate) fn records_are_bounded(records: &Value) -> bool {
+    let Some(records) = records.as_array() else {
+        return false;
+    };
+    records.len() <= MAX_RECORDS
+        && records.iter().all(|record| {
+            let Some(record) = record.as_object() else {
+                return false;
+            };
+            let token_ok = record
+                .get("token")
+                .and_then(Value::as_str)
+                .is_none_or(|token| token.chars().count() <= MAX_TOKEN_CHARS);
+            let logprob_ok = record
+                .get("logprob")
+                .and_then(Value::as_f64)
+                .is_none_or(f64::is_finite);
+            let bytes_ok = record.get("bytes").is_none_or(|bytes| {
+                bytes.as_array().is_some_and(|bytes| {
+                    bytes.len() <= MAX_BYTES
+                        && bytes
+                            .iter()
+                            .all(|byte| byte.as_u64().is_some_and(|byte| byte <= u8::MAX as u64))
+                })
+            });
+            let alternatives_ok = record.get("top_logprobs").is_none_or(|alternatives| {
+                alternatives
+                    .as_array()
+                    .is_some_and(|alternatives| alternatives.len() <= 20)
+            });
+            token_ok && logprob_ok && bytes_ok && alternatives_ok
+        })
+}
+
+fn validate(records: &Value) -> Result<(), Failure> {
+    records_are_bounded(records).then_some(()).ok_or_else(|| {
+        Failure::new(
+            FailureClass::MalformedResponse,
+            "Responses probability records exceeded the supported shape",
+        )
+    })
+}
 
 /// Extract probability records from a Responses output text event.
 pub(crate) fn payload_records(payload: &Map<String, Value>) -> Option<Value> {
@@ -30,20 +78,21 @@ pub(crate) fn item_done_events(
     let Some(content) = item.get("content").and_then(Value::as_array) else {
         return Ok(Vec::new());
     };
-    Ok(content
-        .iter()
-        .enumerate()
-        .filter_map(|(content_index, part)| {
-            let records = part.as_object()?.get("logprobs")?.clone();
-            Some(Event::ProviderResponsesLogprobs {
-                output_index,
-                item_id: item_id.to_string(),
-                content_index: content_index as u32,
-                phase: "item_done".to_string(),
-                records,
-            })
-        })
-        .collect())
+    let mut events = Vec::new();
+    for (content_index, part) in content.iter().enumerate() {
+        let Some(records) = part.as_object().and_then(|part| part.get("logprobs")) else {
+            continue;
+        };
+        validate(records)?;
+        events.push(Event::ProviderResponsesLogprobs {
+            output_index,
+            item_id: item_id.to_string(),
+            content_index: content_index as u32,
+            phase: "item_done".to_string(),
+            records: records.clone(),
+        });
+    }
+    Ok(events)
 }
 
 /// Extract terminal probability observations from the final response object.
@@ -73,6 +122,7 @@ pub(crate) fn terminal_events(response: &Map<String, Value>) -> Result<Vec<Event
             let Some(records) = part.as_object().and_then(|part| part.get("logprobs")) else {
                 continue;
             };
+            validate(records)?;
             events.push(Event::ProviderResponsesLogprobs {
                 output_index: output_index as u32,
                 item_id: item_id.to_string(),
