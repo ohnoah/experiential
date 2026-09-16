@@ -138,12 +138,27 @@ impl ResponsesSseEncoder {
                     .entry(*content_index)
                     .or_default()
                     .insert(phase.clone(), records.clone());
-                let public_item_id = state.item_id.clone();
-                let public_output_index = state.output_index;
                 if phase != "delta" {
                     return Ok(Vec::new());
                 }
-                Ok(vec![self.event(
+                let start_part = !state.text_started;
+                state.text_started = true;
+                let public_item_id = state.item_id.clone();
+                let public_output_index = state.output_index;
+                drop(state);
+                let mut frames = Vec::new();
+                if start_part {
+                    frames.push(self.event(
+                        "response.content_part.added",
+                        json!({
+                            "item_id": public_item_id.clone(),
+                            "output_index": public_output_index,
+                            "content_index": content_index,
+                            "part": {"type": "output_text", "text": "", "annotations": []},
+                        }),
+                    ));
+                }
+                frames.push(self.event(
                     "response.output_text.delta",
                     json!({
                         "item_id": public_item_id,
@@ -152,7 +167,8 @@ impl ResponsesSseEncoder {
                         "delta": "",
                         "logprobs": records,
                     }),
-                )])
+                ));
+                Ok(frames)
             }
             Event::ChoiceLogprobsDelta(_) => Err(invalid_provider_stream(
                 "Chat token probabilities cannot be projected on this surface.",
