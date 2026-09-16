@@ -1732,11 +1732,23 @@ def test_responses_ws_probability_generation_preserves_phases(
             if event["type"] in {"response.completed", "response.incomplete"}:
                 break
     delta = next(event for event in events if event["type"] == "response.output_text.delta")
-    assert delta["logprobs"][0]["bytes"] == [79, 75]
+    delta_records = delta.get("logprobs")
+    assert isinstance(delta_records, list) and isinstance(delta_records[0], dict)
+    assert delta_records[0].get("bytes") == [79, 75]
     done = next(event for event in events if event["type"] == "response.output_text.done")
-    assert done["logprobs"][0]["logprob"] == -0.1250001
+    done_records = done.get("logprobs")
+    assert isinstance(done_records, list) and isinstance(done_records[0], dict)
+    assert done_records[0].get("logprob") == -0.1250001
     terminal = events[-1]
-    record = terminal["response"]["output"][0]["content"][0]["logprobs"][0]
+    response = terminal.get("response")
+    assert isinstance(response, dict)
+    output = response.get("output")
+    assert isinstance(output, list) and isinstance(output[0], dict)
+    content = output[0].get("content")
+    assert isinstance(content, list) and isinstance(content[0], dict)
+    terminal_records = content[0].get("logprobs")
+    assert isinstance(terminal_records, list) and isinstance(terminal_records[0], dict)
+    record = terminal_records[0]
     assert record["logprob"] == -0.125000123
     assert record["bytes"] == [79, 75]
 
