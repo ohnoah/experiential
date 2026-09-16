@@ -60,7 +60,7 @@ from exp.runtime.models.providers.generation_parameter_validation import (
     require_route_numeric_parameter as _require_route_numeric_parameter,
 )
 from exp.runtime.models.providers.instruction_turns import disclose_system_fold
-from exp.runtime.models.providers.logprobs import require_chat_logprobs
+from exp.runtime.models.providers.logprobs import require_chat_logprobs, require_responses_logprobs
 from exp.runtime.models.providers.messages_payloads import (
     anthropic_messages_stream_payload as anthropic_messages_stream_payload,
 )
@@ -147,6 +147,7 @@ def route_generation_parameter_requests(
     if not profiles:
         raise ValueError("generation parameter shaping requires at least one wire profile")
     require_chat_logprobs(profiles, request)
+    require_responses_logprobs(profiles, request)
     for profile in profiles:
         if fireworks_continuation_required(profile, request):
             require_responses_continuation_channel(request)

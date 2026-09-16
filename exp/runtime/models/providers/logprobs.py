@@ -54,6 +54,25 @@ def require_chat_logprobs(profiles: Sequence[GatewayWireProfile], request: Gatew
             )
 
 
+def require_responses_logprobs(
+    profiles: Sequence[GatewayWireProfile], request: GatewayRequest
+) -> None:
+    """Require native Responses routes for an active output probability request."""
+    if request.surface != GatewayApiSurface.RESPONSES:
+        return
+    if not request.include_output_text_logprobs and request.top_logprobs is None:
+        return
+    for profile in profiles:
+        if profile.dialect != "openai_responses" or not profile.supports_logprobs:
+            raise ProviderParameterError(
+                message="This model route cannot preserve Responses output text probabilities.",
+                param=(
+                    "top_logprobs"
+                    if request.top_logprobs is not None
+                    else "include"
+                ),
+                code="unsupported_parameter",
+            )
 def require_unmodified_probability_output(request: GatewayRequest, output_checks: bool) -> None:
     """Reject output rewriting until its token alignment can be preserved."""
     if request.logprobs is True and output_checks:

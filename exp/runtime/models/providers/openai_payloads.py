@@ -147,8 +147,23 @@ def openai_responses_stream_payload(
         "stream": True,
     }
     response_store = request.response_store
+    include_paths: list[str] = []
     if request.include_encrypted_reasoning or supports_reasoning and response_store is not False:
-        payload["include"] = ["reasoning.encrypted_content"]
+        include_paths.append("reasoning.encrypted_content")
+    if request.include_output_text_logprobs:
+        if not supports_logprobs:
+            raise ProviderResponseError(
+                "This Responses route cannot preserve output text log probabilities."
+            )
+        include_paths.append("message.output_text.logprobs")
+    if include_paths:
+        payload["include"] = include_paths
+    if request.top_logprobs is not None:
+        if not supports_logprobs:
+            raise ProviderResponseError(
+                "This Responses route cannot preserve output text log probabilities."
+            )
+        payload["top_logprobs"] = request.top_logprobs
     if instructions:
         payload["instructions"] = "\n\n".join(instructions)
     add_openai_tools(payload, request, responses=True)
@@ -199,9 +214,6 @@ def openai_responses_stream_payload(
     # Native OpenAI Responses has no top-k request field. Never trust a
     # mistaken route declaration to send this extension to the API.
     del supports_top_k
-    # Responses output normalization has no probability representation. Keep
-    # the shared capability argument, but ignore logprob controls before send.
-    del supports_logprobs
     reasoning: JsonObject = {}
     if supports_reasoning and effective_reasoning_effort is not None:
         reasoning["effort"] = openai_reasoning_effort(model_id, effective_reasoning_effort)

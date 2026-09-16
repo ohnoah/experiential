@@ -311,6 +311,11 @@ class ResponsesSseEncoder:
     def feed(self, event: GatewayEvent) -> tuple[str, ...]:
         """Encode one ordered normalized event into Responses lifecycle frames."""
         self._require_event(event)
+        if event.kind == GatewayEventKind.CHOICE_LOGPROBS_DELTA:
+            raise self._state_error(
+                "Responses encoder received a Chat probability event; native Responses "
+                "probability observations are required."
+            )
         if event.usage is not None and event.usage.has_token_counts:
             self._usage = event.usage
         if event.kind == GatewayEventKind.TEXT_DELTA:

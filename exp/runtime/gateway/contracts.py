@@ -525,6 +525,8 @@ class GatewayRequest(ContractModel):
     presence_penalty: float | None = Field(default=None, ge=-2, le=2)
     logprobs: StrictBool | None = None
     top_logprobs: StrictInt | None = Field(default=None, ge=0, le=20)
+    include_output_text_logprobs: bool = False
+    """Whether Responses output text probability records were requested."""
     reasoning_effort: ReasoningEffort | None = None
     reasoning_effort_parameter: (
         Literal["reasoning_effort", "reasoning.effort", "output_config.effort"] | None

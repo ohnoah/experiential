@@ -4655,8 +4655,23 @@ def test_chat_logprobs_narrows_to_capable_compatible_rungs_and_forwards_zero() -
     assert payload["top_logprobs"] == 0
 
 
-def test_responses_logprobs_remains_rejected() -> None:
-    """Keep native Responses probability requests outside this Chat slice."""
-    with pytest.raises(OpenAIProtocolError) as raised:
-        decode_responses({"model": "coding", "input": "hi", "top_logprobs": 0})
-    assert raised.value.detail.param == "top_logprobs"
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"model": "coding", "input": "hi", "include": ["message.output_text.logprobs"]},
+        {"model": "coding", "input": "hi", "top_logprobs": 0},
+        {
+            "model": "coding",
+            "input": "hi",
+            "include": ["message.output_text.logprobs"],
+            "top_logprobs": 2,
+        },
+    ],
+)
+def test_responses_logprobs_preserves_independent_intent(payload: JsonObject) -> None:
+    """Responses selector and count remain independent canonical controls."""
+    request = decode_responses(payload).request
+    assert request.surface == GatewayApiSurface.RESPONSES
+    assert request.logprobs is None
+    assert request.include_output_text_logprobs == ("include" in payload)
+    assert request.top_logprobs == payload.get("top_logprobs")
