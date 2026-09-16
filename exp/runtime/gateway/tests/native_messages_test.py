@@ -406,68 +406,86 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                 text_done_records = [{"token": "OK", "logprob": -0.1250001, "bytes": [79, 75]}]
                 terminal_records = [{"token": "OK", "logprob": -0.125000123, "bytes": [79, 75]}]
                 self.wfile.write(
-                    _sse_frame({
-                        "type": "response.output_text.delta",
-                        "output_index": 0,
-                        "item_id": "msg_probability",
-                        "content_index": 0,
-                        "delta": "OK",
-                        "logprobs": records,
-                    })
+                    _sse_frame(
+                        {
+                            "type": "response.output_text.delta",
+                            "output_index": 0,
+                            "item_id": "msg_probability",
+                            "content_index": 0,
+                            "delta": "OK",
+                            "logprobs": records,
+                        }
+                    )
                 )
                 self.wfile.write(
-                    _sse_frame({
-                        "type": "response.output_text.done",
-                        "output_index": 0,
-                        "item_id": "msg_probability",
-                        "content_index": 0,
-                        "text": "OK",
-                        "logprobs": text_done_records,
-                    })
+                    _sse_frame(
+                        {
+                            "type": "response.output_text.done",
+                            "output_index": 0,
+                            "item_id": "msg_probability",
+                            "content_index": 0,
+                            "text": "OK",
+                            "logprobs": text_done_records,
+                        }
+                    )
                 )
                 self.wfile.write(
-                    _sse_frame({
-                        "type": "response.content_part.done",
-                        "output_index": 0,
-                        "item_id": "msg_probability",
-                        "content_index": 0,
-                        "part": {"type": "output_text", "text": "OK", "logprobs": []},
-                    })
+                    _sse_frame(
+                        {
+                            "type": "response.content_part.done",
+                            "output_index": 0,
+                            "item_id": "msg_probability",
+                            "content_index": 0,
+                            "part": {"type": "output_text", "text": "OK", "logprobs": []},
+                        }
+                    )
                 )
                 self.wfile.write(
-                    _sse_frame({
-                        "type": "response.output_item.done",
-                        "output_index": 0,
-                        "item": {
-                            "id": "msg_probability",
-                            "type": "message",
-                            "role": "assistant",
-                            "status": "completed",
-                            "content": [{
-                                "type": "output_text", "text": "OK", "logprobs": terminal_records
-                            }],
-                        },
-                    })
-                )
-                self.wfile.write(
-                    _sse_frame({
-                        "type": "response.completed",
-                        "response": {
-                            "status": "completed",
-                            "output": [{
+                    _sse_frame(
+                        {
+                            "type": "response.output_item.done",
+                            "output_index": 0,
+                            "item": {
                                 "id": "msg_probability",
                                 "type": "message",
                                 "role": "assistant",
                                 "status": "completed",
-                                "content": [{
-                                    "type": "output_text",
-                                    "text": "OK",
-                                    "logprobs": terminal_records,
-                                }],
-                            }],
-                            "usage": {"input_tokens": 1, "output_tokens": 1},
-                        },
-                    })
+                                "content": [
+                                    {
+                                        "type": "output_text",
+                                        "text": "OK",
+                                        "logprobs": terminal_records,
+                                    }
+                                ],
+                            },
+                        }
+                    )
+                )
+                self.wfile.write(
+                    _sse_frame(
+                        {
+                            "type": "response.completed",
+                            "response": {
+                                "status": "completed",
+                                "output": [
+                                    {
+                                        "id": "msg_probability",
+                                        "type": "message",
+                                        "role": "assistant",
+                                        "status": "completed",
+                                        "content": [
+                                            {
+                                                "type": "output_text",
+                                                "text": "OK",
+                                                "logprobs": terminal_records,
+                                            }
+                                        ],
+                                    }
+                                ],
+                                "usage": {"input_tokens": 1, "output_tokens": 1},
+                            },
+                        }
+                    )
                 )
                 self.wfile.write(b"data: [DONE]\n\n")
                 self.wfile.flush()
@@ -925,10 +943,10 @@ def _responses_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_Ser
             supports_temperature=False,
             supports_logprobs=True,
         ),
-            gateway_capabilities=GatewayDeploymentCapabilities(
-                supports_streaming=True,
-                supports_streaming_tool_arguments=True,
-                supports_responses_logprobs=True,
+        gateway_capabilities=GatewayDeploymentCapabilities(
+            supports_streaming=True,
+            supports_streaming_tool_arguments=True,
+            supports_responses_logprobs=True,
         ),
         prices=GatewayTokenPrices(),
         pricing_source=None,
