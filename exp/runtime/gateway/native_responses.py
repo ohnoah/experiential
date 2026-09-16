@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass
 from typing import Literal, cast
 
-from exp.common.core.artifacts import JsonObject, sha256_json
+from exp.common.core.artifacts import JsonObject, JsonValue, sha256_json
 from exp.common.models import ToolCall
 from exp.common.models.gateway_catalog import ExactModelDeployment
 from exp.runtime.gateway.contracts import (
