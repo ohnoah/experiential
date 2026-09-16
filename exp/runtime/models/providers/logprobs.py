@@ -66,13 +66,11 @@ def require_responses_logprobs(
         if profile.dialect != "openai_responses" or not profile.supports_logprobs:
             raise ProviderParameterError(
                 message="This model route cannot preserve Responses output text probabilities.",
-                param=(
-                    "top_logprobs"
-                    if request.top_logprobs is not None
-                    else "include"
-                ),
+                param="top_logprobs" if request.top_logprobs is not None else "include",
                 code="unsupported_parameter",
             )
+
+
 def require_unmodified_probability_output(request: GatewayRequest, output_checks: bool) -> None:
     """Reject output rewriting until its token alignment can be preserved."""
     if request.logprobs is True and output_checks:
