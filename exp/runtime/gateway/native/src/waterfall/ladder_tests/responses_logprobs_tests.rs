@@ -73,3 +73,53 @@ fn responses_probability_records_count_toward_retained_bytes() {
     };
     assert!(crate::relay::event_retained_bytes(&event) > 64);
 }
+
+const EMPTY_DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-empty","content_index":0,"delta":"","logprobs":[]}"#;
+const FAILED: &str = r#"{"type":"response.failed","response":{"status":"failed","error":{"code":"server_error","message":"try another rung"}}}"#;
+const SECOND_DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-b","content_index":0,"delta":"","logprobs":[{"token":"B","logprob":-0.25,"bytes":[66]}]}"#;
+
+#[test]
+fn responses_empty_probability_scaffolding_does_not_escape_failed_attempt() {
+    block_on(async {
+        let harness = Harness::new();
+        let first = spawn_rung(vec![Answer::Stream(&[EMPTY_DELTA, FAILED])]).await;
+        let second = spawn_rung(vec![Answer::Stream(&[SECOND_DELTA, TERMINAL])]).await;
+        let route = [
+            responses_probability_wire("a", &first.url),
+            responses_probability_wire("b", &second.url),
+        ];
+        let mut guard = AttemptGuard::new(
+            harness.bridge.clone(),
+            Arc::new(AtomicUsize::new(0)),
+            "responses-empty-retry".into(),
+            Instant::now(),
+        );
+        let context = WaterfallContext {
+            bridge: &harness.bridge,
+            http: &harness.http,
+            request_id: "responses-empty-retry",
+            raw_key: "key",
+            caller_scope: None,
+            route: &route,
+            policy: RoutePolicy {
+                maximum_total_attempts: 2,
+                maximum_same_deployment_attempts: 1,
+                refusal_failover: true,
+                throttle_redial: None,
+            },
+            deadline: Instant::now() + Duration::from_secs(10),
+            time_to_first_byte: Duration::from_secs(2),
+            time_to_first_byte_slope_seconds_per_million_input_tokens: 0.0,
+            approximate_input_tokens: 1.0,
+            chat_logprobs: false,
+            output_less_retention: None,
+            output_token_cap: None,
+        };
+        let Won::Committed(committed) = acquire_attempt(&context, &mut guard).await else {
+            panic!("fallback must commit");
+        };
+        assert_eq!(committed.depth, 1);
+        assert!(committed.prefix.iter().any(|event| matches!(event, Event::ProviderResponsesLogprobs { records, .. } if records.to_string().contains("B"))));
+        assert!(!committed.prefix.iter().any(|event| matches!(event, Event::ProviderResponsesLogprobs { records, .. } if records.to_string().contains("msg-empty"))));
+    });
+}
