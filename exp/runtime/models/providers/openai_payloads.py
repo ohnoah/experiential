@@ -8,7 +8,7 @@ OpenAI-compatible Chat builders live here; ``dialect_stream_payload`` in
 
 from __future__ import annotations
 
-from exp.common.core.artifacts import JsonObject
+from exp.common.core.artifacts import JsonObject, JsonValue
 from exp.common.models import ChatMaxTokensField
 from exp.runtime.gateway.contracts import GatewayRequest
 from exp.runtime.models.providers.deepseek import is_deepseek_model_id
@@ -39,6 +39,19 @@ _INPUT_MESSAGE_ROLES = frozenset({"user", "system", "developer"})
 _FOREIGN_ITEM_ID_PREFIX = "item_"
 
 
+def _without_probability_metadata(value: JsonValue) -> JsonValue:
+    """Remove output-only probability annotations from replayed input items."""
+    if isinstance(value, dict):
+        return {
+            key: _without_probability_metadata(item)
+            for key, item in value.items()
+            if key != "logprobs"
+        }
+    if isinstance(value, list):
+        return [_without_probability_metadata(item) for item in value]
+    return value
+
+
 def _replayable_native_item(item: JsonObject) -> JsonObject | None:
     """Shape one replayed Responses item for the OpenAI wire; ``None`` drops it.
 
@@ -48,7 +61,7 @@ def _replayable_native_item(item: JsonObject) -> JsonObject | None:
     foreign id is dropped whole: without its encrypted content the provider
     has nothing to resume from, and the id alone is refused).
     """
-    shaped = item
+    shaped = _without_probability_metadata(item)
     item_id = shaped.get("id")
     if isinstance(item_id, str) and item_id.startswith(_FOREIGN_ITEM_ID_PREFIX):
         if shaped.get("type") == "reasoning" and "encrypted_content" not in shaped:
