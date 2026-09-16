@@ -135,7 +135,9 @@ impl ResponsesSseEncoder {
                 }
                 state
                     .logprobs
-                    .insert(format!("{phase}:{content_index}"), records.clone());
+                    .entry(*content_index)
+                    .or_default()
+                    .insert(phase.clone(), records.clone());
                 let public_item_id = state.item_id.clone();
                 let public_output_index = state.output_index;
                 if phase != "delta" {
@@ -883,6 +885,7 @@ impl ResponsesSseEncoder {
             annotations,
             text_started,
             refusal_started,
+            terminal_logprobs,
             item,
         ) = {
             let state = match self.messages.get_mut(&key) {
@@ -907,6 +910,11 @@ impl ResponsesSseEncoder {
                 state.annotations.clone(),
                 state.text_started,
                 state.refusal_started,
+                state
+                    .logprobs
+                    .get(&0)
+                    .and_then(|phases| phases.get("terminal"))
+                    .cloned(),
                 state.item(true, fallback_status),
             )
         };
@@ -920,10 +928,13 @@ impl ResponsesSseEncoder {
                     "output_index": output_index,
                     "content_index": content_index,
                     "text": text,
-                    "logprobs": [],
+                    "logprobs": terminal_logprobs.clone().unwrap_or_else(|| json!([])),
                 }),
             ));
-            let part = json!({"type": "output_text", "text": text, "annotations": annotations});
+            let mut part = json!({"type": "output_text", "text": text, "annotations": annotations});
+            if let Some(records) = terminal_logprobs {
+                part["logprobs"] = records;
+            }
             frames.push(self.event(
                 "response.content_part.done",
                 json!({

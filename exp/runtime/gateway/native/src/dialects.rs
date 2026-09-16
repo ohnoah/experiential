@@ -17,6 +17,7 @@ pub(in crate::dialects) use relay_finish::{
 };
 mod gemini;
 mod openai;
+mod responses_logprobs;
 
 use std::collections::{BTreeMap, BTreeSet};
 

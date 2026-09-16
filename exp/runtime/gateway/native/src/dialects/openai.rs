@@ -18,6 +18,7 @@ use crate::events::{
 const MAXIMUM_OPENAI_ID_CHARS: usize = 256;
 
 mod hosted;
+use super::responses_logprobs::{item_done_events, payload_records, terminal_events};
 use hosted::{is_openai_hosted_item_type, is_openai_hosted_progress_event};
 
 fn openai_identity(
@@ -150,10 +151,7 @@ impl Normalizer {
                     });
                 }
                 let delta = optional_text(&payload, "delta", "OpenAI text delta")?;
-                let records = payload
-                    .get("logprobs")
-                    .or_else(|| payload.get("part").and_then(|part| part.get("logprobs")));
-                if let Some(records) = records {
+                if let Some(records) = payload_records(&payload) {
                     if !records.is_null() {
                         events.push(Event::ProviderResponsesLogprobs {
                             output_index,
@@ -203,10 +201,7 @@ impl Normalizer {
                 });
             }
             "response.output_text.done" | "response.content_part.done" => {
-                let records = payload
-                    .get("logprobs")
-                    .or_else(|| payload.get("part").and_then(|part| part.get("logprobs")));
-                if let Some(records) = records {
+                if let Some(records) = payload_records(&payload) {
                     let output_index =
                         openai_index(&payload, "output_index", "OpenAI output_index")?;
                     let item_id = openai_identity(&payload, "item_id", "OpenAI message item ID")?;
@@ -589,6 +584,9 @@ impl Normalizer {
                     .and_then(Value::as_object)
                     .ok_or_else(|| malformed("OpenAI completed output item must be an object"))?;
                 let done_type = item.get("type").and_then(Value::as_str).unwrap_or("");
+                if done_type == "message" {
+                    events.extend(item_done_events(index, item)?);
+                }
                 if is_openai_hosted_item_type(done_type) {
                     events.extend(self.openai_hosted_item_done(index, done_type, item)?);
                     return Ok(events);
@@ -799,7 +797,7 @@ impl Normalizer {
                 } else {
                     ProviderOutputItemStatus::Completed
                 };
-                events.extend(openai_terminal_logprobs(response)?);
+                events.extend(terminal_events(response)?);
                 events.extend(self.openai_close_unfinished_items(terminal_item_status));
                 // Every incomplete terminal is the provider declaring it cut
                 // the output early, so a call still open mid-fragment is
@@ -937,46 +935,6 @@ impl Normalizer {
         }
         Ok(events)
     }
-}
-
-fn openai_terminal_logprobs(
-    response: &serde_json::Map<String, Value>,
-) -> Result<Vec<Event>, Failure> {
-    let mut events = Vec::new();
-    let Some(output) = response.get("output").and_then(Value::as_array) else {
-        return Ok(events);
-    };
-    for (output_position, item) in output.iter().enumerate() {
-        let Some(item_object) = item.as_object() else {
-            continue;
-        };
-        if item_object.get("type").and_then(Value::as_str) != Some("message") {
-            continue;
-        }
-        let Some(item_id) = item_object.get("id").and_then(Value::as_str) else {
-            continue;
-        };
-        let output_index = item_object
-            .get("output_index")
-            .and_then(Value::as_u64)
-            .unwrap_or(output_position as u64);
-        let Some(content) = item_object.get("content").and_then(Value::as_array) else {
-            continue;
-        };
-        for (content_index, part) in content.iter().enumerate() {
-            let Some(records) = part.get("logprobs") else {
-                continue;
-            };
-            events.push(Event::ProviderResponsesLogprobs {
-                output_index: output_index as u32,
-                item_id: item_id.to_string(),
-                content_index: content_index as u32,
-                phase: "terminal".to_string(),
-                records: records.clone(),
-            });
-        }
-    }
-    Ok(events)
 }
 
 /// One provider error code as text: a string as-is, a numeric status (an

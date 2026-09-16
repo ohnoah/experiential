@@ -81,8 +81,10 @@ pub(crate) struct MessageState {
     pub(crate) annotations: Vec<Value>,
     pub(crate) text_started: bool,
     pub(crate) refusal_started: bool,
-    /// Rich provider probability records keyed by observation phase.
-    pub(crate) logprobs: BTreeMap<String, Value>,
+    /// Rich provider probability records keyed by content part, then phase.
+    /// Keeping both dimensions prevents a later part or phase from replacing
+    /// an earlier observation.
+    pub(crate) logprobs: BTreeMap<u32, BTreeMap<String, Value>>,
     pub(crate) done: bool,
 }
 
@@ -101,8 +103,8 @@ impl MessageState {
             });
             if let Some(value) = self
                 .logprobs
-                .iter()
-                .find_map(|(key, value)| key.strip_prefix("terminal:").map(|_| value))
+                .get(&0)
+                .and_then(|phases| phases.get("terminal"))
             {
                 part["logprobs"] = value.clone();
             }

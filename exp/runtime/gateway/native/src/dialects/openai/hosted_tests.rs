@@ -39,6 +39,43 @@ fn terminal_response_preserves_authoritative_output_probabilities() {
     )));
 }
 
+#[test]
+fn message_item_done_preserves_each_content_part_probability_record() {
+    let mut normalizer = Normalizer::new(Dialect::OpenAiResponses);
+    let done = hosted_frame(serde_json::json!({
+        "type": "response.output_item.done",
+        "output_index": 2,
+        "item": {
+            "id": "msg_2",
+            "type": "message",
+            "status": "completed",
+            "content": [
+                {"type": "output_text", "text": "A", "logprobs": [{"token": "A", "logprob": -0.1}]},
+                {"type": "output_text", "text": "B", "logprobs": [{"token": "B", "logprob": -0.2}]}
+            ]
+        }
+    }));
+    let events = normalizer.feed(&done).expect("item completion normalizes");
+    let probabilities: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event {
+            Event::ProviderResponsesLogprobs {
+                content_index,
+                phase,
+                records,
+                ..
+            } => Some((*content_index, phase.as_str(), records)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(probabilities.len(), 2);
+    assert_eq!(probabilities[0].0, 0);
+    assert_eq!(probabilities[0].1, "item_done");
+    assert_eq!(probabilities[0].2[0]["token"], "A");
+    assert_eq!(probabilities[1].0, 1);
+    assert_eq!(probabilities[1].2[0]["token"], "B");
+}
+
 /// Frame shapes mirror the documented Responses web_search lifecycle
 /// (`output_item.added`, the three `response.web_search_call.*` status
 /// events, `output_item.done` with the final `action`, and a cited answer;
