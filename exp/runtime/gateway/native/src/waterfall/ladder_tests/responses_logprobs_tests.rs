@@ -1,7 +1,7 @@
 //! Responses probability commitment and retention regressions.
 use super::*;
 
-const DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-a","content_index":0,"delta":"OK","logprobs":[{"token":"OK","logprob":-0.125,"bytes":[79,75}]}"#;
+const DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-a","content_index":0,"delta":"OK","logprobs":[{"token":"OK","logprob":-0.125,"bytes":[79,75]}]}"#;
 const TERMINAL: &str = r#"{"type":"response.completed","response":{"status":"completed","output":[{"id":"msg-a","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"OK","logprobs":[{"token":"OK","logprob":-0.125,"bytes":[79,75]}]}]}],"usage":{"input_tokens":1,"output_tokens":1}}}"#;
 
 fn responses_probability_wire(id: &str, url: &str) -> DeploymentWire {
@@ -59,7 +59,7 @@ fn responses_probability_commits_without_ttft_and_prevents_late_fallback() {
 
 #[test]
 fn responses_probability_records_count_toward_retained_bytes() {
-    let records = json!([{"token":"x","logprob":-0.1,"bytes":[120],"top_logprobs":[]}]);
+    let records = json!([{"token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","logprob":-0.1,"bytes":[120],"top_logprobs":[]}]);
     let event = Event::ProviderResponsesLogprobs {
         output_index: 0,
         item_id: "msg".into(),
