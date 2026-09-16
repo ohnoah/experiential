@@ -409,6 +409,7 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                 terminal_event = f"response.{terminal_status}"
                 records = [{"token": "OK", "logprob": -0.125, "bytes": [79, 75]}]
                 text_done_records = [{"token": "OK", "logprob": -0.1250001, "bytes": [79, 75]}]
+                item_done_records = [{"token": "OK", "logprob": -0.1250002, "bytes": [79, 75]}]
                 terminal_records = [{"token": "OK", "logprob": -0.125000123, "bytes": [79, 75]}]
                 self.wfile.write(
                     _sse_frame(
@@ -459,7 +460,7 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                                     {
                                         "type": "output_text",
                                         "text": "OK",
-                                        "logprobs": terminal_records,
+                                        "logprobs": item_done_records,
                                     }
                                 ],
                             },
@@ -1697,6 +1698,7 @@ def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
         event.model_dump() for event in events if event.type == "response.output_item.done"
     )
     assert item_done["item"]["content"][0]["logprobs"][0]["token"] == "OK"
+    assert item_done["item"]["content"][0]["logprobs"][0]["logprob"] == -0.1250002
     body = final.model_dump()
     assert body["output"][0]["content"][0]["text"] == "OK"
     assert body["output"][0]["content"][0]["logprobs"]
