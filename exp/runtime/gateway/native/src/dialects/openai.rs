@@ -946,7 +946,7 @@ fn openai_terminal_logprobs(
     let Some(output) = response.get("output").and_then(Value::as_array) else {
         return Ok(events);
     };
-    for item in output {
+    for (output_position, item) in output.iter().enumerate() {
         let Some(item_object) = item.as_object() else {
             continue;
         };
@@ -956,9 +956,10 @@ fn openai_terminal_logprobs(
         let Some(item_id) = item_object.get("id").and_then(Value::as_str) else {
             continue;
         };
-        let Some(output_index) = item_object.get("output_index").and_then(Value::as_u64) else {
-            continue;
-        };
+        let output_index = item_object
+            .get("output_index")
+            .and_then(Value::as_u64)
+            .unwrap_or(output_position as u64);
         let Some(content) = item_object.get("content").and_then(Value::as_array) else {
             continue;
         };

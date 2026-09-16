@@ -13,6 +13,32 @@ fn hosted_frame(payload: serde_json::Value) -> SseEvent {
     }
 }
 
+#[test]
+fn terminal_response_preserves_authoritative_output_probabilities() {
+    let mut normalizer = Normalizer::new(Dialect::OpenAiResponses);
+    let terminal = hosted_frame(serde_json::json!({
+        "type": "response.completed",
+        "response": {
+            "status": "completed",
+            "output": [{
+                "id": "msg_1",
+                "type": "message",
+                "content": [{
+                    "type": "output_text",
+                    "text": "OK",
+                    "logprobs": [{"token": "OK", "logprob": -0.125, "bytes": [79, 75]}]
+                }]
+            }]
+        }
+    }));
+    let events = normalizer.feed(&terminal).expect("terminal normalizes");
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::ProviderResponsesLogprobs { phase, records, output_index: 0, .. }
+        if phase == "terminal" && records[0]["token"] == "OK"
+    )));
+}
+
 /// Frame shapes mirror the documented Responses web_search lifecycle
 /// (`output_item.added`, the three `response.web_search_call.*` status
 /// events, `output_item.done` with the final `action`, and a cited answer;
