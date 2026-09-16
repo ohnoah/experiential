@@ -1654,7 +1654,7 @@ def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
     assert "response.output_text.done" in event_types
     assert "response.output_item.done" in event_types
     assert final.output[0].content[0].text == "OK"
-    assert final.output[0].content[0].logprobs, events
+    assert final.output[0].content[0].logprobs, [event.model_dump() for event in events]
     assert final.output[0].content[0].logprobs[0].token == "OK"
     assert final.output[0].content[0].logprobs[0].bytes == [79, 75]
     body = final.model_dump()
