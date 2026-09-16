@@ -443,7 +443,9 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                             "type": "message",
                             "role": "assistant",
                             "status": "completed",
-                            "content": [{"type": "output_text", "text": "OK", "logprobs": terminal_records}],
+                            "content": [{
+                                "type": "output_text", "text": "OK", "logprobs": terminal_records
+                            }],
                         },
                     })
                 )
@@ -457,7 +459,9 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                                 "type": "message",
                                 "role": "assistant",
                                 "status": "completed",
-                                "content": [{"type": "output_text", "text": "OK", "logprobs": terminal_records}],
+                                "content": [{
+                                    "type": "output_text", "text": "OK", "logprobs": terminal_records
+                                }],
                             }],
                             "usage": {"input_tokens": 1, "output_tokens": 1},
                         },
