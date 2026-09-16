@@ -154,6 +154,16 @@ pub enum Event {
         item_id: String,
         delta: String,
     },
+    /// One native Responses output-text probability observation. The raw
+    /// provider record is retained by phase; terminal reconciliation owns any
+    /// structural comparison and never synthesizes token bytes.
+    ProviderResponsesLogprobs {
+        output_index: u32,
+        item_id: String,
+        content_index: u32,
+        phase: String,
+        records: Value,
+    },
     /// One refusal delta for a specific provider-owned assistant message item.
     ProviderRefusalDelta {
         output_index: u32,
@@ -377,7 +387,7 @@ pub fn simplified_event(event: &Event) -> Value {
         Event::ChoiceLogprobsDelta(delta) => {
             serde_json::json!({"kind": "choice_logprobs_delta", "choice_index": delta.choice_index, "logprobs": delta.logprobs})
         }
-        Event::ProviderTextDelta {
+            Event::ProviderTextDelta {
             output_index,
             item_id,
             delta,
@@ -386,6 +396,20 @@ pub fn simplified_event(event: &Event) -> Value {
             "output_index": output_index,
             "item_id": item_id,
             "text": delta,
+        }),
+        Event::ProviderResponsesLogprobs {
+            output_index,
+            item_id,
+            content_index,
+            phase,
+            records,
+        } => serde_json::json!({
+            "kind": "provider_responses_logprobs",
+            "output_index": output_index,
+            "item_id": item_id,
+            "content_index": content_index,
+            "phase": phase,
+            "records": records,
         }),
         Event::ProviderRefusalDelta {
             output_index,
