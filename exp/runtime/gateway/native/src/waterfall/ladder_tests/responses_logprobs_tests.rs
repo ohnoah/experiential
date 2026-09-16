@@ -57,6 +57,17 @@ fn responses_probability_commits_without_ttft_and_prevents_late_fallback() {
             event,
             Event::ProviderResponsesLogprobs { records, .. } if records.as_array().is_some_and(|items| !items.is_empty())
         )));
+        let terminal = committed
+            .relay
+            .next_event(
+                Instant::now() + Duration::from_secs(2),
+                Duration::from_secs(2),
+                Instant::now(),
+            )
+            .await
+            .expect("failed Responses terminal")
+            .expect("terminal event");
+        assert!(matches!(terminal, Event::Failed(_)));
         assert!(second.accepted.lock().unwrap().is_empty());
     });
 }
