@@ -2,7 +2,7 @@
 
 use serde_json::{json, Value};
 
-use super::{aggregate, OutputSlot, ResponsesSseEncoder};
+use super::{aggregate, MessageKey, OutputSlot, ResponsesSseEncoder};
 use crate::encode::compact_json;
 use crate::errors::Failure;
 use crate::events::ProviderOutputItemStatus;
@@ -109,7 +109,7 @@ impl ResponsesSseEncoder {
         format!("event: {event_type}\ndata: {encoded}\n\n")
     }
 
-    fn close_message(
+    pub(super) fn close_message(
         &mut self,
         key: MessageKey,
         fallback_status: ProviderOutputItemStatus,
