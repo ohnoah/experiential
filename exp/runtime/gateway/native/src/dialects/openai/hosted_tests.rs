@@ -105,6 +105,19 @@ fn web_search_call_items_pass_through_verbatim_with_their_lifecycle() {
         Event::ProviderResponsesLogprobs { phase, content_index: 0, .. }
         if phase == "delta"
     )));
+    let part_done = hosted_frame(serde_json::json!({
+        "type": "response.content_part.done",
+        "item_id": "msg_1",
+        "output_index": 1,
+        "content_index": 0,
+        "part": {"type": "output_text", "text": "Python 3.14.7.", "logprobs": []},
+    }));
+    let events = normalizer.feed(&part_done).expect("part done normalizes");
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::ProviderResponsesLogprobs { phase, records, .. }
+        if phase == "content_part_done" && records == &serde_json::json!([])
+    )));
     let annotation = hosted_frame(serde_json::json!({
         "type": "response.output_text.annotation.added",
         "item_id": "msg_1",
