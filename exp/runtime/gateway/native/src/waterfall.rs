@@ -134,8 +134,6 @@ fn is_semantic(event: &Event) -> bool {
             | Event::ProviderTextDelta { .. }
             | Event::ProviderRefusalDelta { .. }
             | Event::ChoiceLogprobsDelta { .. }
-            | Event::ProviderResponsesLogprobs { records, .. }
-                if records.as_array().is_some_and(|items| !items.is_empty())
             | Event::ProviderOutputItemCompleted { .. }
             | Event::ReasoningSummaryDelta { .. }
             | Event::ThinkingDelta { .. }
@@ -156,6 +154,10 @@ fn is_semantic(event: &Event) -> bool {
             | Event::HostedToolItemProgress { .. }
             | Event::HostedToolItemCompleted { .. }
             | Event::ProviderTextAnnotation { .. }
+    ) || matches!(
+        event,
+        Event::ProviderResponsesLogprobs { records, .. }
+            if records.as_array().is_some_and(|items| !items.is_empty())
     )
 }
 
