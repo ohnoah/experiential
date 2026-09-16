@@ -95,7 +95,11 @@ fn web_search_call_items_pass_through_verbatim_with_their_lifecycle() {
         "logprobs": [{"token": "Python", "logprob": -0.25, "bytes": [80, 121]}],
     }));
     let events = normalizer.feed(&text).expect("text normalizes");
-    assert_eq!(events.len(), 3, "message start plus probability and text delta");
+    assert_eq!(
+        events.len(),
+        3,
+        "message start plus probability and text delta"
+    );
     assert!(events.iter().any(|event| matches!(
         event,
         Event::ProviderResponsesLogprobs { phase, content_index: 0, .. }

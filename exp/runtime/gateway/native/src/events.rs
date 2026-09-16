@@ -387,7 +387,7 @@ pub fn simplified_event(event: &Event) -> Value {
         Event::ChoiceLogprobsDelta(delta) => {
             serde_json::json!({"kind": "choice_logprobs_delta", "choice_index": delta.choice_index, "logprobs": delta.logprobs})
         }
-            Event::ProviderTextDelta {
+        Event::ProviderTextDelta {
             output_index,
             item_id,
             delta,

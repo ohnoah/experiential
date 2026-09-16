@@ -150,7 +150,10 @@ impl Normalizer {
                     });
                 }
                 let delta = optional_text(&payload, "delta", "OpenAI text delta")?;
-                if let Some(records) = payload.get("logprobs") {
+                let records = payload
+                    .get("logprobs")
+                    .or_else(|| payload.get("part").and_then(|part| part.get("logprobs")));
+                if let Some(records) = records {
                     if !records.is_null() {
                         events.push(Event::ProviderResponsesLogprobs {
                             output_index,
@@ -158,11 +161,7 @@ impl Normalizer {
                             content_index: payload
                                 .get("content_index")
                                 .map(|_| {
-                                    openai_index(
-                                        &payload,
-                                        "content_index",
-                                        "OpenAI content_index",
-                                    )
+                                    openai_index(&payload, "content_index", "OpenAI content_index")
                                 })
                                 .transpose()?
                                 .unwrap_or(0),
@@ -205,7 +204,8 @@ impl Normalizer {
             }
             "response.output_text.done" | "response.content_part.done" => {
                 if let Some(records) = payload.get("logprobs") {
-                    let output_index = openai_index(&payload, "output_index", "OpenAI output_index")?;
+                    let output_index =
+                        openai_index(&payload, "output_index", "OpenAI output_index")?;
                     let item_id = openai_identity(&payload, "item_id", "OpenAI message item ID")?;
                     let content_index = payload
                         .get("content_index")

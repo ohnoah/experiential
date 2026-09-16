@@ -129,11 +129,18 @@ impl ResponsesSseEncoder {
                     invalid_provider_stream("Responses probabilities arrived before message")
                 })?;
                 if state.item_id != *item_id {
-                    return Err(invalid_provider_stream("Responses message identity changed"));
+                    return Err(invalid_provider_stream(
+                        "Responses message identity changed",
+                    ));
                 }
-                state.logprobs.insert(phase.clone(), records.clone());
+                state
+                    .logprobs
+                    .insert(format!("{phase}:{content_index}"), records.clone());
                 let public_item_id = state.item_id.clone();
                 let public_output_index = state.output_index;
+                if phase != "delta" {
+                    return Ok(Vec::new());
+                }
                 Ok(vec![self.event(
                     "response.output_text.delta",
                     json!({
