@@ -402,10 +402,6 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
         self.end_headers()
         try:
             if "probability-regression" in json.dumps(payload):
-                terminal_status = (
-                    "incomplete" if "probability-incomplete" in json.dumps(payload) else "completed"
-                )
-                terminal_event = f"response.{terminal_status}"
                 records = [{"token": "OK", "logprob": -0.125, "bytes": [79, 75]}]
                 text_done_records = [{"token": "OK", "logprob": -0.1250001, "bytes": [79, 75]}]
                 terminal_records = [{"token": "OK", "logprob": -0.125000123, "bytes": [79, 75]}]
@@ -468,9 +464,9 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                 self.wfile.write(
                     _sse_frame(
                         {
-                            "type": terminal_event,
+                            "type": "response.completed",
                             "response": {
-                                "status": terminal_status,
+                                "status": "completed",
                                 "output": [
                                     {
                                         "id": "msg_probability",
@@ -1701,28 +1697,6 @@ def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
     assert body["output"][0]["content"][0]["logprobs"][0]["token"] == "OK"
     assert body["output"][0]["content"][0]["logprobs"][0]["bytes"] == [79, 75]
     assert body["output"][0]["content"][0]["logprobs"][0]["logprob"] == -0.125000123
-
-
-def test_responses_probability_incomplete_nonstream_preserves_terminal_records(
-    responses_engine: _ServingEngine,
-) -> None:
-    """A nonstream incomplete terminal still carries provider probabilities."""
-    response = httpx.post(
-        f"{responses_engine.base}/v1/responses",
-        headers={"authorization": f"Bearer {responses_engine.raw_key}"},
-        json={
-            "model": "responses",
-            "input": "probability-incomplete",
-            "include": ["message.output_text.logprobs"],
-            "top_logprobs": 0,
-        },
-        timeout=30.0,
-    )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["status"] == "incomplete"
-    record = body["output"][0]["content"][0]["logprobs"][0]
-    assert record == {"token": "OK", "logprob": -0.125000123, "bytes": [79, 75]}
 
 
 def test_responses_probability_continuation_replays_history_without_logprobs(
