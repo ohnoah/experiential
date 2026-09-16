@@ -117,6 +117,9 @@ impl ResponsesSseEncoder {
             ));
         }
         match event {
+            Event::ProviderResponsesLogprobs { .. } => Err(invalid_provider_stream(
+                "Responses probability encoding is not yet wired.",
+            )),
             Event::ChoiceLogprobsDelta(_) => Err(invalid_provider_stream(
                 "Chat token probabilities cannot be projected on this surface.",
             )),
