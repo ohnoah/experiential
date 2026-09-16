@@ -15,7 +15,7 @@ fn responses_probability_wire(id: &str, url: &str) -> DeploymentWire {
 fn responses_probability_commits_without_ttft_and_prevents_late_fallback() {
     block_on(async {
         let harness = Harness::new();
-        let first = spawn_rung(vec![Answer::Stream(&[DELTA, TERMINAL])]).await;
+        let first = spawn_rung(vec![Answer::Stream(&[DELTA, FAILED])]).await;
         let second = spawn_rung(vec![Answer::Stream(&[DELTA, TERMINAL])]).await;
         let route = [
             responses_probability_wire("a", &first.url),
@@ -77,6 +77,7 @@ fn responses_probability_records_count_toward_retained_bytes() {
 const EMPTY_DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-empty","content_index":0,"delta":"","logprobs":[]}"#;
 const FAILED: &str =
     r#"{"type":"error","code":"rate_limit_exceeded","message":"try another rung"}"#;
+const SECOND_TERMINAL: &str = r#"{"type":"response.completed","response":{"status":"completed","output":[{"id":"msg-b","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"B","logprobs":[{"token":"B","logprob":-0.25,"bytes":[66]}]}]}],"usage":{"input_tokens":1,"output_tokens":1}}}"#;
 const SECOND_DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-b","content_index":0,"delta":"","logprobs":[{"token":"B","logprob":-0.25,"bytes":[66]}]}"#;
 
 #[test]
@@ -84,7 +85,7 @@ fn responses_empty_probability_scaffolding_does_not_escape_failed_attempt() {
     block_on(async {
         let harness = Harness::new();
         let first = spawn_rung(vec![Answer::Stream(&[EMPTY_DELTA, FAILED])]).await;
-        let second = spawn_rung(vec![Answer::Stream(&[SECOND_DELTA, TERMINAL])]).await;
+        let second = spawn_rung(vec![Answer::Stream(&[SECOND_DELTA, SECOND_TERMINAL])]).await;
         let route = [
             responses_probability_wire("a", &first.url),
             responses_probability_wire("b", &second.url),
@@ -120,7 +121,20 @@ fn responses_empty_probability_scaffolding_does_not_escape_failed_attempt() {
             panic!("fallback must commit");
         };
         assert_eq!(committed.depth, 1);
-        assert!(committed.prefix.iter().any(|event| matches!(event, Event::ProviderResponsesLogprobs { records, .. } if records.to_string().contains("B"))));
-        assert!(!committed.prefix.iter().any(|event| matches!(event, Event::ProviderResponsesLogprobs { records, .. } if records.to_string().contains("msg-empty"))));
+        assert_eq!(
+            committed
+                .prefix
+                .iter()
+                .filter_map(|event| match event {
+                    Event::ProviderResponsesLogprobs {
+                        item_id, records, ..
+                    } => Some((item_id, records)),
+                    _ => None,
+                })
+                .map(|(item_id, records)| (item_id.as_str(), records.clone()))
+                .collect::<Vec<_>>(),
+            vec![("msg-b", json!([{"token":"B","logprob":-0.25,"bytes":[66]}]))],
+        );
+        assert!(!committed.prefix.iter().any(|event| matches!(event, Event::ProviderOutputItemStarted { item_id: Some(item_id), .. } if item_id == "msg-empty")));
     });
 }
