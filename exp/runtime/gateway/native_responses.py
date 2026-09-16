@@ -427,7 +427,9 @@ def remember_turn(
                 output_index,
                 GatewayMessage(
                     role="assistant",
-                    provider_native_item=_without_probability_metadata(hosted_item),
+                    provider_native_item=cast(
+                        JsonObject, _without_probability_metadata(hosted_item)
+                    ),
                 ),
             )
         )

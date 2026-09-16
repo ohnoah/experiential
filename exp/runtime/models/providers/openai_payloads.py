@@ -8,6 +8,8 @@ OpenAI-compatible Chat builders live here; ``dialect_stream_payload`` in
 
 from __future__ import annotations
 
+from typing import cast
+
 from exp.common.core.artifacts import JsonObject, JsonValue
 from exp.common.models import ChatMaxTokensField
 from exp.runtime.gateway.contracts import GatewayRequest
@@ -61,7 +63,8 @@ def _replayable_native_item(item: JsonObject) -> JsonObject | None:
     foreign id is dropped whole: without its encrypted content the provider
     has nothing to resume from, and the id alone is refused).
     """
-    shaped = _without_probability_metadata(item)
+    projected = _without_probability_metadata(item)
+    shaped = cast(JsonObject, projected)
     item_id = shaped.get("id")
     if isinstance(item_id, str) and item_id.startswith(_FOREIGN_ITEM_ID_PREFIX):
         if shaped.get("type") == "reasoning" and "encrypted_content" not in shaped:
