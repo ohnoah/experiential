@@ -73,9 +73,20 @@ def require_responses_logprobs(
 
 def require_unmodified_probability_output(request: GatewayRequest, output_checks: bool) -> None:
     """Reject output rewriting until its token alignment can be preserved."""
-    if request.logprobs is True and output_checks:
+    active = (
+        request.logprobs is True
+        or request.include_output_text_logprobs
+        or request.top_logprobs is not None
+    )
+    if active and output_checks:
+        parameter = (
+            "logprobs"
+            if request.surface == GatewayApiSurface.CHAT_COMPLETIONS
+            else ("top_logprobs" if request.top_logprobs is not None else "include")
+        )
+        surface = "Chat" if request.surface == GatewayApiSurface.CHAT_COMPLETIONS else "Responses"
         raise ProviderParameterError(
-            message="Chat logprobs cannot be combined with output guardrails.",
-            param="logprobs",
+            message=f"{surface} probabilities cannot be combined with output guardrails.",
+            param=parameter,
             code="unsupported_parameter",
         )
