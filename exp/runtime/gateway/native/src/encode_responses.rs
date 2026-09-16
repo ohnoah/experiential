@@ -138,6 +138,18 @@ impl ResponsesSseEncoder {
                         "Responses message identity changed",
                     ));
                 }
+                let records_size = probability_size(records).ok_or_else(|| {
+                    invalid_provider_stream("Responses probability records exceed the size limit.")
+                })?;
+                state.probability_bytes = state
+                    .probability_bytes
+                    .checked_add(records_size)
+                    .filter(|size| *size <= 1_048_576)
+                    .ok_or_else(|| {
+                        invalid_provider_stream(
+                            "Responses probability output exceeds the size limit.",
+                        )
+                    })?;
                 state
                     .logprobs
                     .entry(*content_index)
@@ -440,6 +452,7 @@ impl ResponsesSseEncoder {
             refusal: String::new(),
             annotations: Vec::new(),
             logprobs: BTreeMap::new(),
+            probability_bytes: 0,
             text_started: false,
             refusal_started: false,
             done: false,

@@ -14,8 +14,45 @@ pub(crate) fn records_are_bounded(records: &Value) -> bool {
     let Some(records) = records.as_array() else {
         return false;
     };
-    serde_json::to_vec(records).is_ok_and(|encoded| encoded.len() <= MAX_RECORDS_BYTES)
-        && records.iter().all(valid_record)
+    json_size(records, MAX_RECORDS_BYTES).is_some() && records.iter().all(valid_record)
+}
+
+/// Count JSON bytes without allocating a serialized copy.
+pub(crate) fn json_size(value: &Value, limit: usize) -> Option<usize> {
+    fn add(total: &mut usize, amount: usize, limit: usize) -> Option<()> {
+        *total = total.checked_add(amount)?;
+        (*total <= limit).then_some(())
+    }
+    fn walk(value: &Value, limit: usize) -> Option<usize> {
+        let mut total = 0;
+        match value {
+            Value::Null => add(&mut total, 4, limit)?,
+            Value::Bool(value) => add(&mut total, if *value { 4 } else { 5 }, limit)?,
+            Value::Number(value) => add(&mut total, value.to_string().len(), limit)?,
+            Value::String(value) => add(&mut total, value.len() + 2, limit)?,
+            Value::Array(values) => {
+                add(&mut total, 2, limit)?;
+                for value in values {
+                    total = total.checked_add(walk(value, limit - total)?)?;
+                    if total > limit {
+                        return None;
+                    }
+                }
+            }
+            Value::Object(values) => {
+                add(&mut total, 2, limit)?;
+                for (key, value) in values {
+                    total = total.checked_add(key.len() + 3)?;
+                    total = total.checked_add(walk(value, limit - total)?)?;
+                    if total > limit {
+                        return None;
+                    }
+                }
+            }
+        }
+        Some(total)
+    }
+    walk(value, limit)
 }
 
 fn valid_record(record: &Value) -> bool {

@@ -3,12 +3,36 @@
 //! records, plus the ordered public output-slot vocabulary.
 
 use std::collections::BTreeMap;
+use std::io::{self, Write};
 
 use serde_json::{json, Value};
 
 use crate::events::{
     ProviderAssistantMessagePhase, ProviderOutputItemKind, ProviderOutputItemStatus,
 };
+
+const MAX_PROBABILITY_BYTES: usize = 1_048_576;
+
+struct ByteCounter {
+    size: usize,
+}
+
+impl Write for ByteCounter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.size = self.size.saturating_add(bytes.len());
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+pub(crate) fn probability_size(value: &Value) -> Option<usize> {
+    let mut counter = ByteCounter { size: 0 };
+    serde_json::to_writer(&mut counter, value).ok()?;
+    (counter.size <= MAX_PROBABILITY_BYTES).then_some(counter.size)
+}
 
 /// One accumulated reasoning item with provider-indexed summary parts and
 /// an optional opaque encrypted payload the caller replays verbatim.
@@ -85,6 +109,7 @@ pub(crate) struct MessageState {
     /// Keeping both dimensions prevents a later part or phase from replacing
     /// an earlier observation.
     pub(crate) logprobs: BTreeMap<u32, BTreeMap<String, Value>>,
+    pub(crate) probability_bytes: usize,
     pub(crate) done: bool,
 }
 
