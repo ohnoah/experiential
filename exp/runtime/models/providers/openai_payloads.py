@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from exp.common.core.artifacts import JsonObject
+from exp.common.core.artifacts import JsonObject, JsonValue
 from exp.common.models import ChatMaxTokensField
 from exp.runtime.gateway.contracts import GatewayRequest
 from exp.runtime.models.providers.deepseek import is_deepseek_model_id
