@@ -145,7 +145,7 @@ impl ResponsesSseEncoder {
                 state.text_started = true;
                 let public_item_id = state.item_id.clone();
                 let public_output_index = state.output_index;
-                drop(state);
+                let _ = state;
                 let mut frames = Vec::new();
                 if start_part {
                     frames.push(self.event(

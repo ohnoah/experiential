@@ -1653,10 +1653,14 @@ def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
     assert "response.output_text.delta" in event_types
     assert "response.output_text.done" in event_types
     assert "response.output_item.done" in event_types
+    delta_event = next(event for event in events if event.type == "response.output_text.delta")
+    assert delta_event.logprobs[0].bytes == [79, 75]
+    text_done = next(event for event in events if event.type == "response.output_text.done")
+    assert text_done.logprobs[0].token == "OK"
+    item_done = next(event for event in events if event.type == "response.output_item.done")
+    assert item_done.item.content[0].logprobs[0].token == "OK"
     assert final.output[0].content[0].text == "OK"
-    assert final.output[0].content[0].logprobs, [
-        {"type": event.type, "logprobs": getattr(event, "logprobs", None)} for event in events
-    ]
+    assert final.output[0].content[0].logprobs
     assert final.output[0].content[0].logprobs[0].token == "OK"
     assert final.output[0].content[0].logprobs[0].bytes == [79, 75]
     body = final.model_dump()
