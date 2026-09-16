@@ -128,6 +128,7 @@ impl ResponsesSseEncoder {
                     text: String::new(),
                     refusal: String::new(),
                     annotations: Vec::new(),
+                    logprobs: BTreeMap::new(),
                     text_started: false,
                     refusal_started: false,
                     done: false,

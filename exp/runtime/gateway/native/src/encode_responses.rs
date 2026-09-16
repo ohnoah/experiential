@@ -117,9 +117,23 @@ impl ResponsesSseEncoder {
             ));
         }
         match event {
-            Event::ProviderResponsesLogprobs { .. } => Err(invalid_provider_stream(
-                "Responses probability encoding is not yet wired.",
-            )),
+            Event::ProviderResponsesLogprobs {
+                output_index,
+                item_id,
+                phase,
+                records,
+                ..
+            } => {
+                let key = MessageKey::Provider(*output_index);
+                let state = self.messages.get_mut(&key).ok_or_else(|| {
+                    invalid_provider_stream("Responses probabilities arrived before message")
+                })?;
+                if state.item_id != *item_id {
+                    return Err(invalid_provider_stream("Responses message identity changed"));
+                }
+                state.logprobs.insert(phase.clone(), records.clone());
+                Ok(Vec::new())
+            }
             Event::ChoiceLogprobsDelta(_) => Err(invalid_provider_stream(
                 "Chat token probabilities cannot be projected on this surface.",
             )),
@@ -384,6 +398,7 @@ impl ResponsesSseEncoder {
             text: String::new(),
             refusal: String::new(),
             annotations: Vec::new(),
+            logprobs: BTreeMap::new(),
             text_started: false,
             refusal_started: false,
             done: false,

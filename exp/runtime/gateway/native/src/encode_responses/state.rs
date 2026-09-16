@@ -81,6 +81,8 @@ pub(crate) struct MessageState {
     pub(crate) annotations: Vec<Value>,
     pub(crate) text_started: bool,
     pub(crate) refusal_started: bool,
+    /// Rich provider probability records keyed by observation phase.
+    pub(crate) logprobs: BTreeMap<String, Value>,
     pub(crate) done: bool,
 }
 
@@ -92,11 +94,15 @@ impl MessageState {
     ) -> Value {
         let mut content = Vec::new();
         if include_content && self.text_started {
-            content.push(json!({
+            let mut part = json!({
                 "type": "output_text",
                 "text": self.text,
                 "annotations": self.annotations,
-            }));
+            });
+            if let Some(value) = self.logprobs.get("terminal") {
+                part["logprobs"] = value.clone();
+            }
+            content.push(part);
         }
         if include_content && self.refusal_started {
             content.push(json!({"type": "refusal", "refusal": self.refusal}));
