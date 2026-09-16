@@ -403,6 +403,8 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
         try:
             if "probability-regression" in json.dumps(payload):
                 records = [{"token": "OK", "logprob": -0.125, "bytes": [79, 75]}]
+                text_done_records = [{"token": "OK", "logprob": -0.1250001, "bytes": [79, 75]}]
+                terminal_records = [{"token": "OK", "logprob": -0.125000123, "bytes": [79, 75]}]
                 self.wfile.write(
                     _sse_frame({
                         "type": "response.output_text.delta",
@@ -420,7 +422,7 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                         "item_id": "msg_probability",
                         "content_index": 0,
                         "text": "OK",
-                        "logprobs": records,
+                        "logprobs": text_done_records,
                     })
                 )
                 self.wfile.write(
@@ -441,7 +443,7 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                             "type": "message",
                             "role": "assistant",
                             "status": "completed",
-                            "content": [{"type": "output_text", "text": "OK", "logprobs": records}],
+                            "content": [{"type": "output_text", "text": "OK", "logprobs": terminal_records}],
                         },
                     })
                 )
@@ -455,7 +457,7 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                                 "type": "message",
                                 "role": "assistant",
                                 "status": "completed",
-                                "content": [{"type": "output_text", "text": "OK", "logprobs": records}],
+                                "content": [{"type": "output_text", "text": "OK", "logprobs": terminal_records}],
                             }],
                             "usage": {"input_tokens": 1, "output_tokens": 1},
                         },
@@ -1664,7 +1666,7 @@ def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
     assert final.output[0].content[0].logprobs[0].token == "OK"
     assert final.output[0].content[0].logprobs[0].bytes == [79, 75]
     body = final.model_dump()
-    assert body["output"][0]["content"][0]["logprobs"][0]["logprob"] == -0.125
+    assert body["output"][0]["content"][0]["logprobs"][0]["logprob"] == -0.125000123
 
 
 @pytest.mark.parametrize(("prompt", "stop_reason"), _ZERO_OUTPUT_MESSAGES_CASES)

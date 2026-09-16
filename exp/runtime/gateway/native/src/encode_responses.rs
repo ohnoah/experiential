@@ -901,7 +901,8 @@ impl ResponsesSseEncoder {
             annotations,
             text_started,
             refusal_started,
-            terminal_logprobs,
+            text_done_logprobs,
+            content_part_done_logprobs,
             item,
         ) = {
             let state = match self.messages.get_mut(&key) {
@@ -929,7 +930,12 @@ impl ResponsesSseEncoder {
                 state
                     .logprobs
                     .get(&0)
-                    .and_then(|phases| phases.get("terminal"))
+                    .and_then(|phases| phases.get("text_done"))
+                    .cloned(),
+                state
+                    .logprobs
+                    .get(&0)
+                    .and_then(|phases| phases.get("content_part_done"))
                     .cloned(),
                 state.item(true, fallback_status),
             )
@@ -944,11 +950,11 @@ impl ResponsesSseEncoder {
                     "output_index": output_index,
                     "content_index": content_index,
                     "text": text,
-                    "logprobs": terminal_logprobs.clone().unwrap_or_else(|| json!([])),
+                    "logprobs": text_done_logprobs.unwrap_or_else(|| json!([])),
                 }),
             ));
             let mut part = json!({"type": "output_text", "text": text, "annotations": annotations});
-            if let Some(records) = terminal_logprobs {
+            if let Some(records) = content_part_done_logprobs {
                 part["logprobs"] = records;
             }
             frames.push(self.event(
