@@ -460,7 +460,9 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                                 "role": "assistant",
                                 "status": "completed",
                                 "content": [{
-                                    "type": "output_text", "text": "OK", "logprobs": terminal_records
+                                    "type": "output_text",
+                                    "text": "OK",
+                                    "logprobs": terminal_records,
                                 }],
                             }],
                             "usage": {"input_tokens": 1, "output_tokens": 1},
