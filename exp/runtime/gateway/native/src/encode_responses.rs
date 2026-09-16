@@ -120,9 +120,9 @@ impl ResponsesSseEncoder {
             Event::ProviderResponsesLogprobs {
                 output_index,
                 item_id,
+                content_index,
                 phase,
                 records,
-                ..
             } => {
                 let key = MessageKey::Provider(*output_index);
                 let state = self.messages.get_mut(&key).ok_or_else(|| {
@@ -132,7 +132,18 @@ impl ResponsesSseEncoder {
                     return Err(invalid_provider_stream("Responses message identity changed"));
                 }
                 state.logprobs.insert(phase.clone(), records.clone());
-                Ok(Vec::new())
+                let public_item_id = state.item_id.clone();
+                let public_output_index = state.output_index;
+                Ok(vec![self.event(
+                    "response.output_text.delta",
+                    json!({
+                        "item_id": public_item_id,
+                        "output_index": public_output_index,
+                        "content_index": content_index,
+                        "delta": "",
+                        "logprobs": records,
+                    }),
+                )])
             }
             Event::ChoiceLogprobsDelta(_) => Err(invalid_provider_stream(
                 "Chat token probabilities cannot be projected on this surface.",
