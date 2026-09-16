@@ -20,17 +20,17 @@ def require_chat_logprobs(profiles: Sequence[GatewayWireProfile], request: Gatew
     if request.logprobs is not True and request.top_logprobs is None:
         return
     parameter = "top_logprobs" if request.top_logprobs is not None else "logprobs"
-    if request.top_logprobs is not None and request.logprobs is not True:
-        raise ProviderParameterError(
-            message="top_logprobs requires logprobs=true.",
-            param="top_logprobs",
-            code="invalid_parameter",
-        )
     if request.surface != GatewayApiSurface.CHAT_COMPLETIONS:
         raise ProviderParameterError(
             message="Token probabilities are supported only on Chat Completions.",
             param=parameter,
             code="unsupported_parameter",
+        )
+    if request.top_logprobs is not None and request.logprobs is not True:
+        raise ProviderParameterError(
+            message="top_logprobs requires logprobs=true.",
+            param="top_logprobs",
+            code="invalid_parameter",
         )
     for profile in profiles:
         compatible = profile.dialect == "openai_compatible" and profile.supports_logprobs is True

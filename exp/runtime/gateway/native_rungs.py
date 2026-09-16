@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from exp.common.core.artifacts import JsonObject, sha256_bytes
 from exp.common.models.gateway_catalog import ExactModelDeployment
-from exp.runtime.gateway.contracts import AuthorizationSnapshot, GatewayRequest
+from exp.runtime.gateway.contracts import AuthorizationSnapshot, GatewayApiSurface, GatewayRequest
 from exp.runtime.gateway.native_admission import shape_parallel_tool_calls
 from exp.runtime.gateway.native_dispatch import frozen_dispatch
 from exp.runtime.gateway.native_execution import FrozenDispatchBinding, deployment_wire_entry
@@ -79,7 +79,8 @@ def build_rung_dispatch(
     rung_request, parallel_disclosure = shape_parallel_tool_calls(
         provider_request, deployment.gateway.capabilities
     )
-    require_chat_logprobs((profile,), rung_request)
+    if rung_request.surface == GatewayApiSurface.CHAT_COMPLETIONS:
+        require_chat_logprobs((profile,), rung_request)
     require_responses_logprobs((profile,), rung_request)
     upstream_payload = dialect_stream_payload(profile, rung_request)
     upstream_body, signer = frozen_dispatch(profile, client, upstream_payload)
