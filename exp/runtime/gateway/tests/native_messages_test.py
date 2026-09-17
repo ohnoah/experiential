@@ -402,6 +402,12 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
         try:
+            if "count-only" in json.dumps(payload):
+                self.wfile.write(_sse_frame({"type": "response.output_text.delta", "output_index": 0, "item_id": "msg_count", "content_index": 0, "delta": "count", "logprobs": []}))
+                self.wfile.write(_sse_frame({"type": "response.completed", "response": {"status": "completed", "output": [{"id": "msg_count", "type": "message", "status": "completed", "content": [{"type": "output_text", "text": "count", "logprobs": []}]}]}}))
+                self.wfile.write(b"data: [DONE]\n\n")
+                self.wfile.flush()
+                return
             if "probability-regression" in json.dumps(payload) or "message.output_text.logprobs" in payload.get("include", []):
                 terminal_status = (
                     "incomplete" if "probability-incomplete" in json.dumps(payload) else "completed"
@@ -1724,7 +1730,11 @@ def test_responses_count_only_does_not_add_include_or_records(
     assert "logprobs" not in json.dumps(body)
     with _ResponsesUpstream.payloads_lock:
         dispatched = tuple(_ResponsesUpstream.payloads)
-    assert dispatched and "include" not in dispatched[-1]
+    assert dispatched
+    include = dispatched[-1].get("include", [])
+    assert isinstance(include, list)
+    assert "message.output_text.logprobs" not in include
+    assert dispatched[-1]["top_logprobs"] == 2
 
 
 def test_responses_ws_probability_generation_preserves_phases(
