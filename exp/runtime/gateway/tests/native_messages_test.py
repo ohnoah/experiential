@@ -1765,7 +1765,7 @@ def test_responses_count_only_does_not_add_include_or_records(
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert "logprobs" not in json.dumps(body)
+    assert body["output"][0]["content"][0]["logprobs"] == []
     with _ResponsesUpstream.payloads_lock:
         dispatched = tuple(_ResponsesUpstream.payloads)
     assert dispatched
