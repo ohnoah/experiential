@@ -126,40 +126,7 @@ impl SettledAttempt {
     }
 }
 
-fn is_semantic(event: &Event) -> bool {
-    matches!(
-        event,
-        Event::TextDelta(_)
-            | Event::RefusalDelta(_)
-            | Event::ProviderTextDelta { .. }
-            | Event::ProviderRefusalDelta { .. }
-            | Event::ChoiceLogprobsDelta { .. }
-            | Event::ProviderOutputItemCompleted { .. }
-            | Event::ReasoningSummaryDelta { .. }
-            | Event::ThinkingDelta { .. }
-            | Event::ThinkingSignature { .. }
-            | Event::RedactedThinking { .. }
-            | Event::EncryptedReasoning { .. }
-            | Event::ReasoningContentDelta { .. }
-            | Event::ToolCallStarted { .. }
-            | Event::ToolArgumentsDelta { .. }
-            | Event::ToolCallCompleted { .. }
-            | Event::TextBlockStarted { .. }
-            | Event::CitationDelta { .. }
-            | Event::ServerToolUseStarted { .. }
-            | Event::ServerToolArgumentsDelta { .. }
-            | Event::ServerToolUseCompleted { .. }
-            | Event::ServerToolResult { .. }
-            | Event::HostedToolItemStarted { .. }
-            | Event::HostedToolItemProgress { .. }
-            | Event::HostedToolItemCompleted { .. }
-            | Event::ProviderTextAnnotation { .. }
-    ) || matches!(
-        event,
-        Event::ProviderResponsesLogprobs { records, .. }
-            if records.as_array().is_some_and(|items| !items.is_empty())
-    )
-}
+use semantic::is_semantic;
 
 /// The control plane's answer to one `start_attempt` callback.
 #[derive(Debug, Deserialize)]
@@ -987,6 +954,7 @@ async fn settle_output_less(
     })
 }
 
+mod semantic;
 mod wire;
 pub(crate) use wire::{first_byte_allowance, open_phase_bound};
 pub use wire::{DeploymentWire, RoutePolicy, WaterfallContext};
