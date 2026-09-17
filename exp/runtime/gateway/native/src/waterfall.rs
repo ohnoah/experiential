@@ -690,6 +690,7 @@ async fn run_attempt(
         let mut usage: Option<Usage> = None;
         let mut tool_names: Vec<String> = Vec::new();
         let mut withheld: Vec<Event> = Vec::new();
+        let mut pending_scaffolding: Vec<Event> = Vec::new();
         let mut withheld_bytes = 0usize;
         loop {
             let event = match relay
@@ -721,6 +722,10 @@ async fn run_attempt(
                 }
             };
             track_event(&event, &mut usage, &mut tool_names);
+            if matches!(event, Event::ProviderOutputItemStarted { .. }) {
+                pending_scaffolding.push(event);
+                continue;
+            }
             if crate::logprobs::withhold_before_commit(&event, ctx.policy.refusal_failover) {
                 let event_bytes = crate::relay::event_retained_bytes(&event);
                 if withheld_bytes.saturating_add(event_bytes) > MAXIMUM_WITHHELD_REFUSAL_BYTES
@@ -745,7 +750,8 @@ async fn run_attempt(
                             encrypted_reasoning_stripped,
                         };
                     }
-                    let mut prefix = std::mem::take(&mut withheld);
+                    let mut prefix = std::mem::take(&mut pending_scaffolding);
+                    prefix.extend(std::mem::take(&mut withheld));
                     prefix.push(event);
                     return AttemptEnd::Committed(Box::new(CommittedAttempt {
                         depth,
@@ -766,7 +772,8 @@ async fn run_attempt(
                 // withheld refusals flush ahead of it.
                 let visible_refusal = withheld.iter().any(crate::logprobs::is_refusal_text)
                     || crate::logprobs::is_refusal_text(&event);
-                let mut prefix = std::mem::take(&mut withheld);
+                let mut prefix = std::mem::take(&mut pending_scaffolding);
+                prefix.extend(std::mem::take(&mut withheld));
                 prefix.push(event);
                 return AttemptEnd::Committed(Box::new(CommittedAttempt {
                     depth,
