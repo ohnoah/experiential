@@ -723,13 +723,34 @@ async fn run_attempt(
             };
             track_event(&event, &mut usage, &mut tool_names);
             if matches!(event, Event::ProviderOutputItemStarted { .. }) {
+                let event_bytes = crate::relay::event_retained_bytes(&event);
+                if withheld_bytes.saturating_add(event_bytes) > MAXIMUM_WITHHELD_REFUSAL_BYTES
+                    || pending_scaffolding.len() + withheld.len() + 1
+                        > MAXIMUM_WITHHELD_REFUSAL_EVENTS
+                {
+                    return AttemptEnd::Ladder {
+                        failure: Failure::new(
+                            FailureClass::MalformedResponse,
+                            crate::dialects::OUTPUT_OVERFLOW_MESSAGE,
+                        )
+                        .with_retry(false, true),
+                        refusal_eligible: false,
+                        exhaustion_flush: Vec::new(),
+                        usage,
+                        tool_names,
+                        opened: true,
+                        encrypted_reasoning_stripped,
+                    };
+                }
+                withheld_bytes += event_bytes;
                 pending_scaffolding.push(event);
                 continue;
             }
             if crate::logprobs::withhold_before_commit(&event, ctx.policy.refusal_failover) {
                 let event_bytes = crate::relay::event_retained_bytes(&event);
                 if withheld_bytes.saturating_add(event_bytes) > MAXIMUM_WITHHELD_REFUSAL_BYTES
-                    || withheld.len() + 1 > MAXIMUM_WITHHELD_REFUSAL_EVENTS
+                    || pending_scaffolding.len() + withheld.len() + 1
+                        > MAXIMUM_WITHHELD_REFUSAL_EVENTS
                 {
                     let visible_refusal = withheld.iter().any(crate::logprobs::is_refusal_text)
                         || crate::logprobs::is_refusal_text(&event);
