@@ -402,7 +402,7 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
         try:
-            if "probability-regression" in json.dumps(payload) or "top_logprobs" in payload:
+            if "probability-regression" in json.dumps(payload) or "message.output_text.logprobs" in payload.get("include", []):
                 terminal_status = (
                     "incomplete" if "probability-incomplete" in json.dumps(payload) else "completed"
                 )
@@ -1705,6 +1705,26 @@ def test_responses_sdk_stream_preserves_probability_phases_and_final_json(
     assert body["output"][0]["content"][0]["logprobs"][0]["token"] == "OK"
     assert body["output"][0]["content"][0]["logprobs"][0]["bytes"] == [79, 75]
     assert body["output"][0]["content"][0]["logprobs"][0]["logprob"] == -0.125000123
+
+
+def test_responses_count_only_does_not_add_include_or_records(
+    responses_engine: _ServingEngine,
+) -> None:
+    """A count alone forwards no selector and returns no probability records."""
+    with _ResponsesUpstream.payloads_lock:
+        _ResponsesUpstream.payloads.clear()
+    response = httpx.post(
+        f"{responses_engine.base}/v1/responses",
+        headers={"authorization": f"Bearer {responses_engine.raw_key}"},
+        json={"model": "responses", "input": "count-only", "top_logprobs": 2},
+        timeout=30.0,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert "logprobs" not in json.dumps(body)
+    with _ResponsesUpstream.payloads_lock:
+        dispatched = tuple(_ResponsesUpstream.payloads)
+    assert dispatched and "include" not in dispatched[-1]
 
 
 def test_responses_ws_probability_generation_preserves_phases(
