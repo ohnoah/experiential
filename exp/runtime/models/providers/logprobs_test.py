@@ -81,3 +81,11 @@ def test_output_rewriting_rejects_only_active_probability_requests() -> None:
         require_unmodified_probability_output(request, True)
     require_unmodified_probability_output(request, False)
     require_unmodified_probability_output(_chat_request(), True)
+    responses_request = _chat_request().model_copy(
+        update={
+            "surface": GatewayApiSurface.RESPONSES,
+            "include_output_text_logprobs": True,
+        }
+    )
+    with pytest.raises(ProviderParameterError, match="Responses probabilities"):
+        require_unmodified_probability_output(responses_request, True)

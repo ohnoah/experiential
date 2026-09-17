@@ -50,3 +50,21 @@ def test_stream_started_event_preserves_long_tool_id(length: int) -> None:
         tool_name="terminal",
     )
     assert event.tool_call_id == "x" * length
+
+
+def test_native_responses_probability_event_round_trips_from_rust_shape() -> None:
+    """Native probability observations preserve part identity and raw records."""
+    event = GatewayEvent.model_validate(
+        {
+            "kind": "provider_responses_logprobs",
+            "sequence_number": 4,
+            "output_index": 0,
+            "item_id": "msg_1",
+            "content_index": 1,
+            "phase": "terminal",
+            "records": [{"token": "OK", "logprob": -0.125, "bytes": [79, 75]}],
+        }
+    )
+    assert event.responses_item_id == "msg_1"
+    assert event.responses_content_index == 1
+    assert event.responses_logprobs_phase == "terminal"

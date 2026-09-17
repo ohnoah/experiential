@@ -181,6 +181,9 @@ class GatewayWireProfile:
     supports_logprobs: bool = False
     """Whether this exact model accepts Chat token probability requests."""
 
+    supports_responses_logprobs: bool = False
+    """Whether this exact Responses route preserves output text probabilities."""
+
     logprobs_reasoning_efforts: tuple[ReasoningEffort, ...] = ()
     """Explicit probability-compatible efforts for reasoning models; empty is unknown."""
 

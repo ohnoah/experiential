@@ -60,7 +60,21 @@ pub fn event_retained_bytes(event: &Event) -> usize {
         }
         Event::HostedToolItemProgress { payload, .. } => payload.len(),
         Event::ProviderTextAnnotation { annotation, .. } => annotation.len(),
+        Event::ProviderOutputItemStarted { item_id, .. } => {
+            64usize.saturating_add(item_id.as_deref().map_or(0, str::len))
+        }
         Event::ChoiceLogprobsDelta(delta) => delta.retained_bytes(),
+        Event::ProviderResponsesLogprobs {
+            item_id,
+            phase,
+            records,
+            ..
+        } => crate::dialects::records_retained_bytes(records)
+            .map(|size| {
+                size.saturating_add(item_id.len())
+                    .saturating_add(phase.len())
+            })
+            .unwrap_or(MAXIMUM_RETAINED_OUTPUT_BYTES.saturating_add(1)),
         _ => 64,
     }
 }

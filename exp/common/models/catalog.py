@@ -409,6 +409,7 @@ class GatewayDeploymentCapabilities(ContractModel):
     supports_developer_messages: bool = False
     supports_streaming: bool = False
     supports_streaming_tool_arguments: bool = False
+    supports_responses_logprobs: bool = False
     supports_strict_tools: bool = False
     supports_parallel_tool_calls: bool = False
     supports_structured_text: bool = False

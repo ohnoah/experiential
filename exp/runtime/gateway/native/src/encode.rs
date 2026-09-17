@@ -257,6 +257,9 @@ impl ChatSseEncoder {
         }
         self.reasoning.observe(event)?;
         match event {
+            Event::ProviderResponsesLogprobs { .. } => Err(invalid_provider_stream(
+                "Responses probability events require the Responses encoder",
+            )),
             Event::ChoiceLogprobsDelta(update) => Ok(vec![self.chunk_with_logprobs(
                 json!({}),
                 None,

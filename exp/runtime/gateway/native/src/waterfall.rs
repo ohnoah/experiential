@@ -126,37 +126,7 @@ impl SettledAttempt {
     }
 }
 
-fn is_semantic(event: &Event) -> bool {
-    matches!(
-        event,
-        Event::TextDelta(_)
-            | Event::RefusalDelta(_)
-            | Event::ProviderTextDelta { .. }
-            | Event::ProviderRefusalDelta { .. }
-            | Event::ChoiceLogprobsDelta { .. }
-            | Event::ProviderOutputItemStarted { .. }
-            | Event::ProviderOutputItemCompleted { .. }
-            | Event::ReasoningSummaryDelta { .. }
-            | Event::ThinkingDelta { .. }
-            | Event::ThinkingSignature { .. }
-            | Event::RedactedThinking { .. }
-            | Event::EncryptedReasoning { .. }
-            | Event::ReasoningContentDelta { .. }
-            | Event::ToolCallStarted { .. }
-            | Event::ToolArgumentsDelta { .. }
-            | Event::ToolCallCompleted { .. }
-            | Event::TextBlockStarted { .. }
-            | Event::CitationDelta { .. }
-            | Event::ServerToolUseStarted { .. }
-            | Event::ServerToolArgumentsDelta { .. }
-            | Event::ServerToolUseCompleted { .. }
-            | Event::ServerToolResult { .. }
-            | Event::HostedToolItemStarted { .. }
-            | Event::HostedToolItemProgress { .. }
-            | Event::HostedToolItemCompleted { .. }
-            | Event::ProviderTextAnnotation { .. }
-    )
-}
+use semantic::is_semantic;
 
 /// The control plane's answer to one `start_attempt` callback.
 #[derive(Debug, Deserialize)]
@@ -687,6 +657,7 @@ async fn run_attempt(
         let mut usage: Option<Usage> = None;
         let mut tool_names: Vec<String> = Vec::new();
         let mut withheld: Vec<Event> = Vec::new();
+        let mut pending_scaffolding: Vec<Event> = Vec::new();
         let mut withheld_bytes = 0usize;
         loop {
             let event = match relay
@@ -718,10 +689,35 @@ async fn run_attempt(
                 }
             };
             track_event(&event, &mut usage, &mut tool_names);
+            if matches!(event, Event::ProviderOutputItemStarted { .. }) {
+                let event_bytes = crate::relay::event_retained_bytes(&event);
+                if withheld_bytes.saturating_add(event_bytes) > MAXIMUM_WITHHELD_REFUSAL_BYTES
+                    || pending_scaffolding.len() + withheld.len() + 1
+                        > MAXIMUM_WITHHELD_REFUSAL_EVENTS
+                {
+                    return AttemptEnd::Ladder {
+                        failure: Failure::new(
+                            FailureClass::MalformedResponse,
+                            crate::dialects::OUTPUT_OVERFLOW_MESSAGE,
+                        )
+                        .with_retry(false, true),
+                        refusal_eligible: false,
+                        exhaustion_flush: Vec::new(),
+                        usage,
+                        tool_names,
+                        opened: true,
+                        encrypted_reasoning_stripped,
+                    };
+                }
+                withheld_bytes += event_bytes;
+                pending_scaffolding.push(event);
+                continue;
+            }
             if crate::logprobs::withhold_before_commit(&event, ctx.policy.refusal_failover) {
                 let event_bytes = crate::relay::event_retained_bytes(&event);
                 if withheld_bytes.saturating_add(event_bytes) > MAXIMUM_WITHHELD_REFUSAL_BYTES
-                    || withheld.len() + 1 > MAXIMUM_WITHHELD_REFUSAL_EVENTS
+                    || pending_scaffolding.len() + withheld.len() + 1
+                        > MAXIMUM_WITHHELD_REFUSAL_EVENTS
                 {
                     let visible_refusal = withheld.iter().any(crate::logprobs::is_refusal_text)
                         || crate::logprobs::is_refusal_text(&event);
@@ -742,7 +738,8 @@ async fn run_attempt(
                             encrypted_reasoning_stripped,
                         };
                     }
-                    let mut prefix = std::mem::take(&mut withheld);
+                    let mut prefix = std::mem::take(&mut pending_scaffolding);
+                    prefix.extend(std::mem::take(&mut withheld));
                     prefix.push(event);
                     return AttemptEnd::Committed(Box::new(CommittedAttempt {
                         depth,
@@ -763,7 +760,8 @@ async fn run_attempt(
                 // withheld refusals flush ahead of it.
                 let visible_refusal = withheld.iter().any(crate::logprobs::is_refusal_text)
                     || crate::logprobs::is_refusal_text(&event);
-                let mut prefix = std::mem::take(&mut withheld);
+                let mut prefix = std::mem::take(&mut pending_scaffolding);
+                prefix.extend(std::mem::take(&mut withheld));
                 prefix.push(event);
                 return AttemptEnd::Committed(Box::new(CommittedAttempt {
                     depth,
@@ -956,6 +954,7 @@ async fn settle_output_less(
     })
 }
 
+mod semantic;
 mod wire;
 pub(crate) use wire::{first_byte_allowance, open_phase_bound};
 pub use wire::{DeploymentWire, RoutePolicy, WaterfallContext};

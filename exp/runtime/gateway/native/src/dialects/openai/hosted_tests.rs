@@ -13,6 +13,89 @@ fn hosted_frame(payload: serde_json::Value) -> SseEvent {
     }
 }
 
+#[test]
+fn terminal_response_preserves_authoritative_output_probabilities() {
+    let mut normalizer = Normalizer::new(Dialect::OpenAiResponses);
+    let terminal = hosted_frame(serde_json::json!({
+        "type": "response.completed",
+        "response": {
+            "status": "completed",
+            "output": [{
+                "id": "msg_1",
+                "type": "message",
+                "content": [{
+                    "type": "output_text",
+                    "text": "OK",
+                    "logprobs": [{"token": "OK", "logprob": -0.125, "bytes": [79, 75]}]
+                }]
+            }]
+        }
+    }));
+    let events = normalizer.feed(&terminal).expect("terminal normalizes");
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::ProviderResponsesLogprobs { phase, records, output_index: 0, .. }
+        if phase == "terminal" && records[0]["token"] == "OK"
+    )));
+}
+
+#[test]
+fn message_item_done_preserves_each_content_part_probability_record() {
+    let mut normalizer = Normalizer::new(Dialect::OpenAiResponses);
+    let done = hosted_frame(serde_json::json!({
+        "type": "response.output_item.done",
+        "output_index": 2,
+        "item": {
+            "id": "msg_2",
+            "type": "message",
+            "status": "completed",
+            "content": [
+                {"type": "output_text", "text": "A", "logprobs": [{"token": "A", "logprob": -0.1}]},
+                {"type": "output_text", "text": "B", "logprobs": [{"token": "B", "logprob": -0.2}]}
+            ]
+        }
+    }));
+    let events = normalizer.feed(&done).expect("item completion normalizes");
+    let probabilities: Vec<_> = events
+        .iter()
+        .filter_map(|event| match event {
+            Event::ProviderResponsesLogprobs {
+                content_index,
+                phase,
+                records,
+                ..
+            } => Some((*content_index, phase.as_str(), records)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(probabilities.len(), 2);
+    assert_eq!(probabilities[0].0, 0);
+    assert_eq!(probabilities[0].1, "item_done");
+    assert_eq!(probabilities[0].2[0]["token"], "A");
+    assert_eq!(probabilities[1].0, 1);
+    assert_eq!(probabilities[1].2[0]["token"], "B");
+}
+
+#[test]
+fn malformed_responses_probability_records_fail_closed() {
+    for records in [
+        serde_json::json!([{"token": 7, "logprob": -0.1}]),
+        serde_json::json!([{"token": "x", "logprob": "bad"}]),
+        serde_json::json!([{"token": "x", "logprob": -0.1, "top_logprobs": [{"token": "y"}]}]),
+    ] {
+        let mut normalizer = Normalizer::new(Dialect::OpenAiResponses);
+        let frame = hosted_frame(serde_json::json!({
+            "type": "response.output_text.delta",
+            "output_index": 0,
+            "item_id": "msg_bad",
+            "content_index": 0,
+            "delta": "x",
+            "logprobs": records,
+        }));
+        assert!(normalizer.feed(&frame).is_err());
+    }
+}
+
 /// Frame shapes mirror the documented Responses web_search lifecycle
 /// (`output_item.added`, the three `response.web_search_call.*` status
 /// events, `output_item.done` with the final `action`, and a cited answer;
@@ -92,9 +175,32 @@ fn web_search_call_items_pass_through_verbatim_with_their_lifecycle() {
         "output_index": 1,
         "content_index": 0,
         "delta": "Python 3.14.7.",
+        "logprobs": [{"token": "Python", "logprob": -0.25, "bytes": [80, 121]}],
     }));
     let events = normalizer.feed(&text).expect("text normalizes");
-    assert_eq!(events.len(), 2, "message start plus text delta");
+    assert_eq!(
+        events.len(),
+        3,
+        "message start plus probability and text delta"
+    );
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::ProviderResponsesLogprobs { phase, content_index: 0, .. }
+        if phase == "delta"
+    )));
+    let part_done = hosted_frame(serde_json::json!({
+        "type": "response.content_part.done",
+        "item_id": "msg_1",
+        "output_index": 1,
+        "content_index": 0,
+        "part": {"type": "output_text", "text": "Python 3.14.7.", "logprobs": []},
+    }));
+    let events = normalizer.feed(&part_done).expect("part done normalizes");
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::ProviderResponsesLogprobs { phase, records, .. }
+        if phase == "content_part_done" && records == &serde_json::json!([])
+    )));
     let annotation = hosted_frame(serde_json::json!({
         "type": "response.output_text.annotation.added",
         "item_id": "msg_1",

@@ -2285,9 +2285,11 @@ def test_gemini_generation_forwards_stop_and_strict_json_schema() -> None:
     assert generation["responseJsonSchema"] == schema
 
 
-def test_openai_responses_stream_payload_ignores_logprobs_even_when_flagged() -> None:
-    """Responses logprob controls are accepted but not sent without output projection."""
-    request = _chat_request().model_copy(update={"top_logprobs": 5})
+def test_openai_responses_stream_payload_forwards_logprob_intent() -> None:
+    """Native Responses forwards the selector and exact count together."""
+    request = _chat_request().model_copy(
+        update={"top_logprobs": 5, "include_output_text_logprobs": True}
+    )
     payload = openai_responses_stream_payload(
         "exact-model",
         request,
@@ -2295,7 +2297,8 @@ def test_openai_responses_stream_payload_ignores_logprobs_even_when_flagged() ->
         supports_logprobs=True,
     )
 
-    assert "top_logprobs" not in payload
+    assert payload["include"] == ["message.output_text.logprobs"]
+    assert payload["top_logprobs"] == 5
 
 
 def test_dialect_dispatch_builds_the_gemini_payload() -> None:

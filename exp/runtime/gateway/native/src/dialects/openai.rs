@@ -18,6 +18,9 @@ use crate::events::{
 const MAXIMUM_OPENAI_ID_CHARS: usize = 256;
 
 mod hosted;
+use super::responses_logprobs::{
+    item_done_events, payload_records, records_are_bounded, terminal_events,
+};
 use hosted::{is_openai_hosted_item_type, is_openai_hosted_progress_event};
 
 fn openai_identity(
@@ -150,6 +153,28 @@ impl Normalizer {
                     });
                 }
                 let delta = optional_text(&payload, "delta", "OpenAI text delta")?;
+                if let Some(records) = payload_records(&payload) {
+                    if !records_are_bounded(&records) {
+                        return Err(malformed(
+                            "OpenAI Responses probability records are invalid",
+                        ));
+                    }
+                    if !records.is_null() {
+                        events.push(Event::ProviderResponsesLogprobs {
+                            output_index,
+                            item_id: item_id.clone(),
+                            content_index: payload
+                                .get("content_index")
+                                .map(|_| {
+                                    openai_index(&payload, "content_index", "OpenAI content_index")
+                                })
+                                .transpose()?
+                                .unwrap_or(0),
+                            phase: "delta".to_string(),
+                            records: records.clone(),
+                        });
+                    }
+                }
                 if !delta.is_empty() {
                     events.push(Event::ProviderTextDelta {
                         output_index,
@@ -181,6 +206,35 @@ impl Normalizer {
                     item_id,
                     delta,
                 });
+            }
+            "response.output_text.done" | "response.content_part.done" => {
+                if let Some(records) = payload_records(&payload) {
+                    if !records_are_bounded(&records) {
+                        return Err(malformed(
+                            "OpenAI Responses probability records are invalid",
+                        ));
+                    }
+                    let output_index =
+                        openai_index(&payload, "output_index", "OpenAI output_index")?;
+                    let item_id = openai_identity(&payload, "item_id", "OpenAI message item ID")?;
+                    let content_index = payload
+                        .get("content_index")
+                        .map(|_| openai_index(&payload, "content_index", "OpenAI content_index"))
+                        .transpose()?
+                        .unwrap_or(0);
+                    events.push(Event::ProviderResponsesLogprobs {
+                        output_index,
+                        item_id,
+                        content_index,
+                        phase: if event_type.ends_with(".done") && event_type.contains("text") {
+                            "text_done"
+                        } else {
+                            "content_part_done"
+                        }
+                        .to_string(),
+                        records: records.clone(),
+                    });
+                }
             }
             "response.output_text.annotation.added" => {
                 events.extend(self.openai_text_annotation(&payload)?);
@@ -542,6 +596,9 @@ impl Normalizer {
                     .and_then(Value::as_object)
                     .ok_or_else(|| malformed("OpenAI completed output item must be an object"))?;
                 let done_type = item.get("type").and_then(Value::as_str).unwrap_or("");
+                if done_type == "message" {
+                    events.extend(item_done_events(index, item)?);
+                }
                 if is_openai_hosted_item_type(done_type) {
                     events.extend(self.openai_hosted_item_done(index, done_type, item)?);
                     return Ok(events);
@@ -752,6 +809,7 @@ impl Normalizer {
                 } else {
                     ProviderOutputItemStatus::Completed
                 };
+                events.extend(terminal_events(response)?);
                 events.extend(self.openai_close_unfinished_items(terminal_item_status));
                 // Every incomplete terminal is the provider declaring it cut
                 // the output early, so a call still open mid-fragment is

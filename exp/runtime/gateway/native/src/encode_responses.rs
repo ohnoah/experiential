@@ -117,6 +117,94 @@ impl ResponsesSseEncoder {
             ));
         }
         match event {
+            Event::ProviderResponsesLogprobs {
+                output_index,
+                item_id,
+                content_index,
+                phase,
+                records,
+            } => {
+                if *content_index != 0 {
+                    return Err(invalid_provider_stream(
+                        "Responses probability records for multipart content are unsupported.",
+                    ));
+                }
+                let key = MessageKey::Provider(*output_index);
+                let mut frames = Vec::new();
+                self.ensure_message(key, Some(item_id), &mut frames)?;
+                if !self.provider_output_starts.contains_key(output_index) {
+                    let output_index_public = self
+                        .messages
+                        .get(&key)
+                        .expect("message just ensured")
+                        .output_index;
+                    self.provider_output_starts.insert(
+                        *output_index,
+                        ProviderOutputStart {
+                            item_id: Some(item_id.clone()),
+                            kind: ProviderOutputItemKind::Message,
+                            output_index: output_index_public,
+                            status: None,
+                            phase: None,
+                        },
+                    );
+                }
+                let state = self.messages.get_mut(&key).ok_or_else(|| {
+                    invalid_provider_stream("Responses probabilities arrived before message")
+                })?;
+                if state.item_id != *item_id {
+                    return Err(invalid_provider_stream(
+                        "Responses message identity changed",
+                    ));
+                }
+                let records_size = probability_size(records).ok_or_else(|| {
+                    invalid_provider_stream("Responses probability records exceed the size limit.")
+                })?;
+                state.probability_bytes = state
+                    .probability_bytes
+                    .checked_add(records_size)
+                    .filter(|size| *size <= 1_048_576)
+                    .ok_or_else(|| {
+                        invalid_provider_stream(
+                            "Responses probability output exceeds the size limit.",
+                        )
+                    })?;
+                state
+                    .logprobs
+                    .entry(*content_index)
+                    .or_default()
+                    .insert(phase.clone(), records.clone());
+                if phase != "delta" {
+                    return Ok(Vec::new());
+                }
+                let start_part = !state.text_started;
+                state.text_started = true;
+                let public_item_id = state.item_id.clone();
+                let public_output_index = state.output_index;
+                let _ = state;
+                if start_part {
+                    frames.push(self.event(
+                        "response.content_part.added",
+                        json!({
+                            "item_id": public_item_id.clone(),
+                            "output_index": public_output_index,
+                            "content_index": content_index,
+                            "part": {"type": "output_text", "text": "", "annotations": []},
+                        }),
+                    ));
+                }
+                frames.push(self.event(
+                    "response.output_text.delta",
+                    json!({
+                        "item_id": public_item_id,
+                        "output_index": public_output_index,
+                        "content_index": content_index,
+                        "delta": "",
+                        "logprobs": records,
+                    }),
+                ));
+                Ok(frames)
+            }
             Event::ChoiceLogprobsDelta(_) => Err(invalid_provider_stream(
                 "Chat token probabilities cannot be projected on this surface.",
             )),
@@ -381,6 +469,8 @@ impl ResponsesSseEncoder {
             text: String::new(),
             refusal: String::new(),
             annotations: Vec::new(),
+            logprobs: BTreeMap::new(),
+            probability_bytes: 0,
             text_started: false,
             refusal_started: false,
             done: false,
@@ -829,103 +919,6 @@ impl ResponsesSseEncoder {
         frames.push(self.event(
             "response.output_item.done",
             json!({"output_index": output_index, "item": item}),
-        ));
-        frames
-    }
-
-    /// Emit content and output completion for one assistant message.
-    fn close_message(
-        &mut self,
-        key: MessageKey,
-        fallback_status: ProviderOutputItemStatus,
-    ) -> Vec<String> {
-        let (
-            item_id,
-            output_index,
-            text,
-            refusal,
-            annotations,
-            text_started,
-            refusal_started,
-            item,
-        ) = {
-            let state = match self.messages.get_mut(&key) {
-                Some(state) => state,
-                None => return Vec::new(),
-            };
-            if state.done {
-                return Vec::new();
-            }
-            state.done = true;
-            if matches!(
-                state.status,
-                None | Some(ProviderOutputItemStatus::InProgress)
-            ) {
-                state.status = Some(fallback_status);
-            }
-            (
-                state.item_id.clone(),
-                state.output_index,
-                state.text.clone(),
-                state.refusal.clone(),
-                state.annotations.clone(),
-                state.text_started,
-                state.refusal_started,
-                state.item(true, fallback_status),
-            )
-        };
-        let mut frames: Vec<String> = Vec::new();
-        let mut content_index = 0;
-        if text_started {
-            frames.push(self.event(
-                "response.output_text.done",
-                json!({
-                    "item_id": item_id,
-                    "output_index": output_index,
-                    "content_index": content_index,
-                    "text": text,
-                    "logprobs": [],
-                }),
-            ));
-            let part = json!({"type": "output_text", "text": text, "annotations": annotations});
-            frames.push(self.event(
-                "response.content_part.done",
-                json!({
-                    "item_id": item_id,
-                    "output_index": output_index,
-                    "content_index": content_index,
-                    "part": part,
-                }),
-            ));
-            content_index += 1;
-        }
-        if refusal_started {
-            frames.push(self.event(
-                "response.refusal.done",
-                json!({
-                    "item_id": item_id,
-                    "output_index": output_index,
-                    "content_index": content_index,
-                    "refusal": refusal,
-                }),
-            ));
-            let part = json!({"type": "refusal", "refusal": refusal});
-            frames.push(self.event(
-                "response.content_part.done",
-                json!({
-                    "item_id": item_id,
-                    "output_index": output_index,
-                    "content_index": content_index,
-                    "part": part,
-                }),
-            ));
-        }
-        frames.push(self.event(
-            "response.output_item.done",
-            json!({
-                "output_index": output_index,
-                "item": item,
-            }),
         ));
         frames
     }

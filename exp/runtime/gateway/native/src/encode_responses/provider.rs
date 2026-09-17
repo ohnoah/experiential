@@ -128,6 +128,8 @@ impl ResponsesSseEncoder {
                     text: String::new(),
                     refusal: String::new(),
                     annotations: Vec::new(),
+                    logprobs: BTreeMap::new(),
+                    probability_bytes: 0,
                     text_started: false,
                     refusal_started: false,
                     done: false,
@@ -186,7 +188,19 @@ impl ResponsesSseEncoder {
                 }
                 state.status = status.or(state.status);
                 state.phase = phase.or(state.phase);
-                Ok(self.close_message(key, status.unwrap_or(ProviderOutputItemStatus::Completed)))
+                let no_probabilities = state.logprobs.is_empty();
+                let _ = state;
+                if no_probabilities {
+                    return Ok(self.close_message(
+                        key,
+                        status.unwrap_or(ProviderOutputItemStatus::Completed),
+                    ));
+                }
+                // The provider's item completion can precede the terminal
+                // response, whose output carries the authoritative rich
+                // probability records. Keep the message open so finish()
+                // emits one item after that terminal observation is stored.
+                Ok(Vec::new())
             }
             ProviderOutputItemKind::Reasoning => {
                 let state = self

@@ -55,6 +55,10 @@ def _resolved_wire_profile(
         return replace(
             profile,
             model_id=profile.model_id or runtime_model.snapshot.model_id,
+            supports_responses_logprobs=(
+                gateway_capabilities.supports_responses_logprobs
+                and profile.dialect == "openai_responses"
+            ),
             billing_customer_managed=(deployment.billing_source == BillingSource.CUSTOMER_MANAGED),
             service_tier_pricing_enabled=capabilities.service_tier_pricing_enabled,
             service_tier_cards=frozenset(

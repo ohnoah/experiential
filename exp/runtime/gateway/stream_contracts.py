@@ -9,7 +9,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import Field, model_validator
+from pydantic import Field, JsonValue, model_validator
 
 from exp.common.core.artifacts import ContractModel, JsonObject
 from exp.common.models.model import MAXIMUM_TOOL_CALL_ID_CHARACTERS, ToolCall
@@ -100,6 +100,7 @@ class GatewayEventKind(StrEnum):
     TEXT_DELTA = "text_delta"
     REFUSAL_DELTA = "refusal_delta"
     CHOICE_LOGPROBS_DELTA = "choice_logprobs_delta"
+    PROVIDER_RESPONSES_LOGPROBS = "provider_responses_logprobs"
     REASONING_SUMMARY_DELTA = "reasoning_summary_delta"
     THINKING_DELTA = "thinking_delta"
     THINKING_SIGNATURE = "thinking_signature"
@@ -138,6 +139,11 @@ class GatewayEvent(ContractModel):
     usage: GatewayUsage | None = None
     failure: GatewayFailure | None = None
     choice_logprobs_delta: ChoiceLogprobsDelta | None = None
+    responses_output_index: int | None = Field(default=None, ge=0, alias="output_index")
+    responses_item_id: str | None = Field(default=None, alias="item_id")
+    responses_content_index: int | None = Field(default=None, ge=0, alias="content_index")
+    responses_logprobs_phase: str | None = Field(default=None, alias="phase")
+    responses_logprobs_records: JsonValue | None = Field(default=None, alias="records")
 
     @model_validator(mode="after")
     def _require_event_payload(self) -> GatewayEvent:
@@ -155,6 +161,17 @@ class GatewayEvent(ContractModel):
         elif self.kind == GatewayEventKind.CHOICE_LOGPROBS_DELTA:
             if self.choice_logprobs_delta is None:
                 raise ValueError("choice logprobs deltas require their payload")
+        elif self.kind == GatewayEventKind.PROVIDER_RESPONSES_LOGPROBS:
+            if (
+                self.responses_output_index is None
+                or self.responses_item_id is None
+                or self.responses_content_index is None
+                or self.responses_logprobs_phase is None
+                or self.responses_logprobs_records is None
+            ):
+                raise ValueError(
+                    "Responses probability events require identity, phase, and records"
+                )
         elif self.kind == GatewayEventKind.REASONING_SUMMARY_DELTA:
             if (
                 self.text_delta is None

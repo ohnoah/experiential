@@ -696,3 +696,4 @@ fn a_low_stake_request_gets_fewer_redials_than_a_high_stake_one() {
 }
 
 mod logprobs_tests;
+mod responses_logprobs_tests;

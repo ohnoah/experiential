@@ -2,7 +2,7 @@
 
 use serde_json::{json, Value};
 
-use super::{aggregate, OutputSlot, ResponsesSseEncoder};
+use super::{aggregate, MessageKey, OutputSlot, ResponsesSseEncoder};
 use crate::encode::compact_json;
 use crate::errors::Failure;
 use crate::events::ProviderOutputItemStatus;
@@ -107,5 +107,116 @@ impl ResponsesSseEncoder {
         self.sequence += 1;
         let encoded = compact_json(&Value::Object(payload));
         format!("event: {event_type}\ndata: {encoded}\n\n")
+    }
+
+    pub(super) fn close_message(
+        &mut self,
+        key: MessageKey,
+        fallback_status: ProviderOutputItemStatus,
+    ) -> Vec<String> {
+        let (
+            item_id,
+            output_index,
+            text,
+            refusal,
+            annotations,
+            text_started,
+            refusal_started,
+            text_done_logprobs,
+            content_part_done_logprobs,
+            item,
+        ) = {
+            let state = match self.messages.get_mut(&key) {
+                Some(state) => state,
+                None => return Vec::new(),
+            };
+            if state.done {
+                return Vec::new();
+            }
+            state.done = true;
+            if matches!(
+                state.status,
+                None | Some(ProviderOutputItemStatus::InProgress)
+            ) {
+                state.status = Some(fallback_status);
+            }
+            (
+                state.item_id.clone(),
+                state.output_index,
+                state.text.clone(),
+                state.refusal.clone(),
+                state.annotations.clone(),
+                state.text_started,
+                state.refusal_started,
+                state
+                    .logprobs
+                    .get(&0)
+                    .and_then(|phases| phases.get("text_done"))
+                    .cloned(),
+                state
+                    .logprobs
+                    .get(&0)
+                    .and_then(|phases| phases.get("content_part_done"))
+                    .cloned(),
+                state.item_at_phase(true, fallback_status, "item_done"),
+            )
+        };
+        let mut frames: Vec<String> = Vec::new();
+        let mut content_index = 0;
+        if text_started {
+            frames.push(self.event(
+                "response.output_text.done",
+                json!({
+                    "item_id": item_id,
+                    "output_index": output_index,
+                    "content_index": content_index,
+                    "text": text,
+                    "logprobs": text_done_logprobs.unwrap_or_else(|| json!([])),
+                }),
+            ));
+            let mut part = json!({"type": "output_text", "text": text, "annotations": annotations});
+            if let Some(records) = content_part_done_logprobs {
+                part["logprobs"] = records;
+            }
+            frames.push(self.event(
+                "response.content_part.done",
+                json!({
+                    "item_id": item_id,
+                    "output_index": output_index,
+                    "content_index": content_index,
+                    "part": part,
+                }),
+            ));
+            content_index += 1;
+        }
+        if refusal_started {
+            frames.push(self.event(
+                "response.refusal.done",
+                json!({
+                    "item_id": item_id,
+                    "output_index": output_index,
+                    "content_index": content_index,
+                    "refusal": refusal,
+                }),
+            ));
+            let part = json!({"type": "refusal", "refusal": refusal});
+            frames.push(self.event(
+                "response.content_part.done",
+                json!({
+                    "item_id": item_id,
+                    "output_index": output_index,
+                    "content_index": content_index,
+                    "part": part,
+                }),
+            ));
+        }
+        frames.push(self.event(
+            "response.output_item.done",
+            json!({
+                "output_index": output_index,
+                "item": item,
+            }),
+        ));
+        frames
     }
 }
