@@ -1,5 +1,7 @@
 //! Responses probability commitment and retention regressions.
 use super::*;
+use crate::dialects::MAXIMUM_RETAINED_OUTPUT_BYTES;
+use crate::events::ProviderOutputItemKind;
 
 const DELTA: &str = r#"{"type":"response.output_text.delta","output_index":0,"item_id":"msg-a","content_index":0,"delta":"","logprobs":[{"token":"OK","logprob":-0.125,"bytes":[79,75]}]}"#;
 const TERMINAL: &str = r#"{"type":"response.completed","response":{"status":"completed","output":[{"id":"msg-a","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"OK","logprobs":[{"token":"OK","logprob":-0.125,"bytes":[79,75]}]}]}],"usage":{"input_tokens":1,"output_tokens":1}}}"#;
