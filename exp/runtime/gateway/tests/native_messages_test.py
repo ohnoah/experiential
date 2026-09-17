@@ -403,12 +403,50 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
         self.end_headers()
         try:
             if "count-only" in json.dumps(payload):
-                self.wfile.write(_sse_frame({"type": "response.output_text.delta", "output_index": 0, "item_id": "msg_count", "content_index": 0, "delta": "count", "logprobs": []}))
-                self.wfile.write(_sse_frame({"type": "response.completed", "response": {"status": "completed", "output": [{"id": "msg_count", "type": "message", "status": "completed", "content": [{"type": "output_text", "text": "count", "logprobs": []}]}]}}))
+                self.wfile.write(
+                    _sse_frame(
+                        {
+                            "type": "response.output_text.delta",
+                            "output_index": 0,
+                            "item_id": "msg_count",
+                            "content_index": 0,
+                            "delta": "count",
+                            "logprobs": [],
+                        }
+                    )
+                )
+                self.wfile.write(
+                    _sse_frame(
+                        {
+                            "type": "response.completed",
+                            "response": {
+                                "status": "completed",
+                                "output": [
+                                    {
+                                        "id": "msg_count",
+                                        "type": "message",
+                                        "status": "completed",
+                                        "content": [
+                                            {
+                                                "type": "output_text",
+                                                "text": "count",
+                                                "logprobs": [],
+                                            }
+                                        ],
+                                    }
+                                ],
+                            },
+                        }
+                    )
+                )
                 self.wfile.write(b"data: [DONE]\n\n")
                 self.wfile.flush()
                 return
-            if "probability-regression" in json.dumps(payload) or "message.output_text.logprobs" in payload.get("include", []):
+            include = payload.get("include", [])
+            if "probability-regression" in json.dumps(payload) or (
+                isinstance(include, list)
+                and "message.output_text.logprobs" in include
+            ):
                 terminal_status = (
                     "incomplete" if "probability-incomplete" in json.dumps(payload) else "completed"
                 )
