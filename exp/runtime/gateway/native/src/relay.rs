@@ -62,7 +62,7 @@ pub fn event_retained_bytes(event: &Event) -> usize {
         Event::ProviderTextAnnotation { annotation, .. } => annotation.len(),
         Event::ChoiceLogprobsDelta(delta) => delta.retained_bytes(),
         Event::ProviderResponsesLogprobs { records, .. } => {
-            crate::dialects::responses_logprobs::records_retained_bytes(records).unwrap_or(0)
+            crate::dialects::records_retained_bytes(records).unwrap_or(0)
         }
         _ => 64,
     }
