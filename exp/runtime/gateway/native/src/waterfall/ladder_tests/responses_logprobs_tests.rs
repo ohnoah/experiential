@@ -48,7 +48,7 @@ fn responses_probability_commits_without_ttft_and_prevents_late_fallback() {
             output_less_retention: None,
             output_token_cap: None,
         };
-        let Won::Committed(mut committed) = acquire_attempt(&context, &mut guard).await else {
+        let Won::Committed(committed) = acquire_attempt(&context, &mut guard).await else {
             panic!("Responses probabilities must commit");
         };
         assert_eq!(committed.depth, 0);
