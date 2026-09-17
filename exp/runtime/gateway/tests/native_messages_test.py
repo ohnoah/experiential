@@ -444,8 +444,7 @@ class _ResponsesUpstream(BaseHTTPRequestHandler):
                 return
             include = payload.get("include", [])
             if "probability-regression" in json.dumps(payload) or (
-                isinstance(include, list)
-                and "message.output_text.logprobs" in include
+                isinstance(include, list) and "message.output_text.logprobs" in include
             ):
                 terminal_status = (
                     "incomplete" if "probability-incomplete" in json.dumps(payload) else "completed"
