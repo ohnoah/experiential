@@ -154,32 +154,23 @@ impl ResponsesSseEncoder {
         status: Option<ProviderOutputItemStatus>,
         phase: Option<ProviderAssistantMessagePhase>,
     ) -> Result<Vec<String>, PublicError> {
-        let start = self.provider_output_starts.get(&provider_output_index);
-        let implicit_message = kind == ProviderOutputItemKind::Message
-            && self
-                .messages
-                .get(&MessageKey::Provider(provider_output_index))
-                .is_some_and(|state| !state.logprobs.is_empty());
-        if start.is_none() && !implicit_message {
+        let start = self
+            .provider_output_starts
+            .get(&provider_output_index)
+            .ok_or_else(|| {
+                invalid_provider_stream("Responses output item completed before its start.")
+            })?;
+        if start.kind != kind || start.item_id.as_deref() != item_id {
             return Err(invalid_provider_stream(
-                "Responses output item completed before its start.",
+                "Responses output item changed provider identity at completion.",
             ));
-        }
-        if let Some(start) = start {
-            if start.kind != kind || start.item_id.as_deref() != item_id {
-                return Err(invalid_provider_stream(
-                    "Responses output item changed provider identity at completion.",
-                ));
-            }
         }
         if kind != ProviderOutputItemKind::Message && phase.is_some() {
             return Err(invalid_provider_stream(
                 "Responses provider attached a message phase to a non-message item.",
             ));
         }
-        if start
-            .is_some_and(|start| start.phase.is_some() && phase.is_some() && start.phase != phase)
-        {
+        if start.phase.is_some() && phase.is_some() && start.phase != phase {
             return Err(invalid_provider_stream(
                 "Responses assistant message changed phase at completion.",
             ));

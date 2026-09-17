@@ -132,6 +132,23 @@ impl ResponsesSseEncoder {
                 let key = MessageKey::Provider(*output_index);
                 let mut frames = Vec::new();
                 self.ensure_message(key, Some(item_id), &mut frames)?;
+                if !self.provider_output_starts.contains_key(output_index) {
+                    let output_index_public = self
+                        .messages
+                        .get(&key)
+                        .expect("message just ensured")
+                        .output_index;
+                    self.provider_output_starts.insert(
+                        *output_index,
+                        ProviderOutputStart {
+                            item_id: Some(item_id.clone()),
+                            kind: ProviderOutputItemKind::Message,
+                            output_index: output_index_public,
+                            status: None,
+                            phase: None,
+                        },
+                    );
+                }
                 let state = self.messages.get_mut(&key).ok_or_else(|| {
                     invalid_provider_stream("Responses probabilities arrived before message")
                 })?;
