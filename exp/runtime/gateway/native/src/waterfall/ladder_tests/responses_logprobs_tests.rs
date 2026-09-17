@@ -149,3 +149,33 @@ fn responses_empty_probability_scaffolding_does_not_escape_failed_attempt() {
         assert!(!committed.prefix.iter().any(|event| matches!(event, Event::ProviderOutputItemStarted { item_id: Some(item_id), .. } if item_id == "msg-empty")));
     });
 }
+
+#[test]
+fn responses_oversized_probability_retention_fails_closed() {
+    let records = json!([{
+        "token": "x",
+        "logprob": -0.1,
+        "bytes": [120],
+        "opaque": "x".repeat(1_100_000),
+    }]);
+    let event = Event::ProviderResponsesLogprobs {
+        output_index: 0,
+        item_id: "msg".into(),
+        content_index: 0,
+        phase: "delta".into(),
+        records,
+    };
+    assert!(crate::relay::event_retained_bytes(&event) > MAXIMUM_RETAINED_OUTPUT_BYTES);
+}
+
+#[test]
+fn responses_scaffold_retention_charges_item_identity() {
+    let event = Event::ProviderOutputItemStarted {
+        output_index: 0,
+        item_id: Some("x".repeat(4096)),
+        kind: ProviderOutputItemKind::Message,
+        status: None,
+        phase: None,
+    };
+    assert!(crate::relay::event_retained_bytes(&event) >= 4160);
+}
