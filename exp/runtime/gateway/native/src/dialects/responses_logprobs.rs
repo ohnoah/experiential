@@ -15,14 +15,20 @@ pub(crate) fn records_are_bounded(records: &Value) -> bool {
     let Some(records) = records.as_array() else {
         return false;
     };
-    json_size_records(records, MAX_RECORDS_BYTES).is_some() && records.iter().all(valid_record)
+    records_retained_bytes_slice(records).is_some() && records.iter().all(valid_record)
 }
 
 /// Count JSON bytes without allocating a serialized copy.
-fn json_size_records(records: &[Value], limit: usize) -> Option<usize> {
+pub(crate) fn records_retained_bytes(records: &Value) -> Option<usize> {
     let mut counter = ByteCounter { size: 0 };
     serde_json::to_writer(&mut counter, records).ok()?;
-    (counter.size <= limit).then_some(counter.size)
+    (counter.size <= MAX_RECORDS_BYTES).then_some(counter.size)
+}
+
+fn records_retained_bytes_slice(records: &[Value]) -> Option<usize> {
+    let mut counter = ByteCounter { size: 0 };
+    serde_json::to_writer(&mut counter, records).ok()?;
+    (counter.size <= MAX_RECORDS_BYTES).then_some(counter.size)
 }
 
 struct ByteCounter {

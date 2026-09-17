@@ -130,6 +130,8 @@ impl ResponsesSseEncoder {
                     ));
                 }
                 let key = MessageKey::Provider(*output_index);
+                let mut frames = Vec::new();
+                self.ensure_message(key, Some(item_id), &mut frames)?;
                 let state = self.messages.get_mut(&key).ok_or_else(|| {
                     invalid_provider_stream("Responses probabilities arrived before message")
                 })?;
@@ -163,7 +165,6 @@ impl ResponsesSseEncoder {
                 let public_item_id = state.item_id.clone();
                 let public_output_index = state.output_index;
                 let _ = state;
-                let mut frames = Vec::new();
                 if start_part {
                     frames.push(self.event(
                         "response.content_part.added",
