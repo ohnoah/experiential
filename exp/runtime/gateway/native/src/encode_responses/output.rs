@@ -158,7 +158,7 @@ impl ResponsesSseEncoder {
                     .get(&0)
                     .and_then(|phases| phases.get("content_part_done"))
                     .cloned(),
-                state.item(true, fallback_status),
+                state.item_at_phase(true, fallback_status, "item_done"),
             )
         };
         let mut frames: Vec<String> = Vec::new();
