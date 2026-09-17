@@ -60,6 +60,9 @@ pub fn event_retained_bytes(event: &Event) -> usize {
         }
         Event::HostedToolItemProgress { payload, .. } => payload.len(),
         Event::ProviderTextAnnotation { annotation, .. } => annotation.len(),
+        Event::ProviderOutputItemStarted { item_id, .. } => {
+            64usize.saturating_add(item_id.as_deref().map_or(0, str::len))
+        }
         Event::ChoiceLogprobsDelta(delta) => delta.retained_bytes(),
         Event::ProviderResponsesLogprobs {
             item_id,
