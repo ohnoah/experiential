@@ -158,7 +158,8 @@ impl ResponsesSseEncoder {
         let implicit_message = kind == ProviderOutputItemKind::Message
             && self
                 .messages
-                .contains_key(&MessageKey::Provider(provider_output_index));
+                .get(&MessageKey::Provider(provider_output_index))
+                .is_some_and(|state| !state.logprobs.is_empty());
         if start.is_none() && !implicit_message {
             return Err(invalid_provider_stream(
                 "Responses output item completed before its start.",
